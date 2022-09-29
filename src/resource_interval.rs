@@ -13,7 +13,14 @@ impl ResourceInterval {
         ResourceInterval(HashMap::new())
     }
 
-    pub fn insert(&mut self, other: ResourceInterval) {
+    pub fn insert(&mut self, resource: &Resource, intervals: &IntervalSet) {
+        self.0
+            .entry(resource.clone())
+            .or_insert(IntervalSet::new())
+            .merge(intervals);
+    }
+
+    pub fn union(&mut self, other: ResourceInterval) {
         for (res, is) in other.iter() {
             self.0
                 .entry(res.clone())
@@ -22,7 +29,7 @@ impl ResourceInterval {
         }
     }
 
-    pub fn remove(&mut self, other: ResourceInterval) {
+    pub fn subtract(&mut self, other: ResourceInterval) {
         for (res, is) in other.iter() {
             let avail = self.0.entry(res.clone()).or_insert(IntervalSet::new());
             *avail = avail.difference(is);

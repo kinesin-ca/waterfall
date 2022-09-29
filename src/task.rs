@@ -68,7 +68,7 @@ impl TaskDefinition {
             requires: self.requires.clone(),
 
             schedule: schedule,
-            valid_over: IntervalSet::from(vec![Interval::new(start, actual_end)]),
+            valid_over: IntervalSet::from(Interval::new(start, actual_end)),
             timezone: self.timezone,
         }
     }
@@ -293,5 +293,13 @@ mod tests {
                 panic!("{:?}", e);
             }
         };
+
+        // Ensure that the intervals generated over the valid period
+        // exactly cover the valid period
+        let mut theoretical = ResourceInterval::new();
+        theoretical.insert(&"resource_a".to_owned(), &task.valid_over);
+        theoretical.insert(&"resource_b".to_owned(), &task.valid_over);
+        let generated = IntervalSet::from(task.generate_intervals(&theoretical).unwrap());
+        assert_eq!(task.valid_over, generated);
     }
 }
