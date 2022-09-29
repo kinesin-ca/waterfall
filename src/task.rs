@@ -54,7 +54,7 @@ impl TaskDefinition {
 
         let end = match self.valid_to {
             Some(nt) => self.timezone.from_local_datetime(&nt).unwrap(),
-            None => DateTime::<Utc>::MAX_UTC.with_timezone(&self.timezone),
+            None => MAX_TIME.with_timezone(&self.timezone),
         };
 
         let actual_end = schedule.interval(end, 0).start;
@@ -148,10 +148,7 @@ impl Task {
         let end_dt = time.with_timezone(&Utc);
         let horizon_is = self
             .valid_over
-            .difference(&IntervalSet::from(vec![Interval::new(
-                end_dt,
-                DateTime::<Utc>::MAX_UTC,
-            )]));
+            .difference(&IntervalSet::from(vec![Interval::new(end_dt, MAX_TIME)]));
         self.provides.iter().all(|res| {
             if let Some(is) = available.get(res) {
                 !(horizon_is.difference(is)).is_empty()

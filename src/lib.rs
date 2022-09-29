@@ -20,6 +20,9 @@ use crate::storage::*;
 use crate::task::*;
 use crate::varmap::*;
 
+const MAX_TIME: DateTime<Utc> = chrono::DateTime::<Utc>::MAX_UTC;
+const MIN_TIME: DateTime<Utc> = chrono::DateTime::<Utc>::MIN_UTC;
+
 pub type Resource = String;
 pub type TaskDetails = serde_json::Value;
 
@@ -32,4 +35,11 @@ pub mod resource_interval;
 pub mod schedule;
 pub mod storage;
 pub mod task;
+pub mod task_set;
 pub mod varmap;
+
+/*
+    TODO:
+        target_state -> TaskSet.coverage()
+        current state
+*/
