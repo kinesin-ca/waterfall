@@ -91,7 +91,7 @@ impl IntervalSet {
     }
 
     pub fn merge(&mut self, other: &IntervalSet) {
-        self.0.extend(other.0.clone());
+        self.0.extend(other.0.iter().cloned());
         self.coalesce();
     }
 
