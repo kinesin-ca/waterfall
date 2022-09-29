@@ -21,29 +21,38 @@ impl Schedule {
         }
     }
 
-    pub fn generate(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Vec<DateTime<Utc>> {
-        let st = start.with_timezone(&self.timezone);
-        let et = end.with_timezone(&self.timezone);
+    pub fn generate(&self, interval: Interval) -> Vec<Interval> {
+        if self.times.is_empty() {
+            return Vec::new();
+        }
 
-        let mut date = st.date().naive_local();
-        let end_date = et.date().succ().naive_local();
+        let st = interval.start.with_timezone(&self.timezone);
+        let et = interval.end.with_timezone(&self.timezone);
+
+        let mut date = self.calendar.prev(st.date().naive_local());
+        let end_date = self.calendar.next(et.date().succ().naive_local());
 
         let mut times = Vec::new();
+        let mut prev_time = self
+            .timezone
+            .from_local_datetime(&date.and_time(self.times[0]))
+            .unwrap()
+            .with_timezone(&Utc);
         while date < end_date {
-            if self.calendar.includes(date) {
-                for time in &self.times {
-                    let dt = self
-                        .timezone
-                        .from_local_datetime(&date.and_time(*time))
-                        .unwrap();
-                    if dt > start && dt <= end {
-                        times.push(dt.with_timezone(&Utc));
-                    } else if end < dt {
-                        break;
-                    }
+            for time in &self.times {
+                let dt = self
+                    .timezone
+                    .from_local_datetime(&date.and_time(*time))
+                    .unwrap()
+                    .with_timezone(&Utc);
+                if dt > interval.start && dt <= interval.end {
+                    times.push(Interval::new(prev_time, dt));
+                } else if interval.end < dt {
+                    break;
                 }
+                prev_time = dt;
             }
-            date = date.succ();
+            date = self.calendar.next(date);
         }
 
         times
@@ -164,7 +173,7 @@ mod tests {
         };
 
         // Simple generation
-        let times = sched.generate(
+        let times = sched.generate(Interval::new(
             timezone
                 .ymd(2022, 1, 3)
                 .and_hms(11, 0, 0)
@@ -173,20 +182,26 @@ mod tests {
                 .ymd(2022, 1, 3)
                 .and_hms(12, 0, 0)
                 .with_timezone(&Utc),
-        );
+        ));
 
         assert_eq!(times.len(), 1);
         assert_eq!(
             times,
-            vec![timezone
-                .ymd(2022, 1, 3)
-                .and_hms(11, 30, 0)
-                .with_timezone(&Utc),]
+            vec![Interval::new(
+                timezone
+                    .ymd(2022, 1, 3)
+                    .and_hms(10, 30, 0)
+                    .with_timezone(&Utc),
+                timezone
+                    .ymd(2022, 1, 3)
+                    .and_hms(11, 30, 0)
+                    .with_timezone(&Utc),
+            )]
         );
 
         // Generating scheduled times over a timerange
         assert_eq!(
-            sched.generate(
+            sched.generate(Interval::new(
                 timezone
                     .ymd(2021, 12, 31)
                     .and_hms(0, 0, 0)
@@ -195,32 +210,68 @@ mod tests {
                     .ymd(2022, 1, 5)
                     .and_hms(0, 0, 0)
                     .with_timezone(&Utc),
-            ),
+            )),
             vec![
-                timezone
-                    .ymd(2021, 12, 31)
-                    .and_hms(10, 30, 0)
-                    .with_timezone(&Utc),
-                timezone
-                    .ymd(2021, 12, 31)
-                    .and_hms(11, 30, 0)
-                    .with_timezone(&Utc),
-                timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(10, 30, 0)
-                    .with_timezone(&Utc),
-                timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(11, 30, 0)
-                    .with_timezone(&Utc),
-                timezone
-                    .ymd(2022, 1, 4)
-                    .and_hms(10, 30, 0)
-                    .with_timezone(&Utc),
-                timezone
-                    .ymd(2022, 1, 4)
-                    .and_hms(11, 30, 0)
-                    .with_timezone(&Utc),
+                Interval::new(
+                    timezone
+                        .ymd(2021, 12, 30)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2021, 12, 31)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .ymd(2021, 12, 31)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2021, 12, 31)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .ymd(2021, 12, 31)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2022, 1, 3)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .ymd(2022, 1, 3)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2022, 1, 3)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .ymd(2022, 1, 3)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2022, 1, 4)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .ymd(2022, 1, 4)
+                        .and_hms(10, 30, 0)
+                        .with_timezone(&Utc),
+                    timezone
+                        .ymd(2022, 1, 4)
+                        .and_hms(11, 30, 0)
+                        .with_timezone(&Utc),
+                )
             ]
         );
     }
