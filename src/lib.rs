@@ -14,12 +14,13 @@ use crate::interval::*;
 use crate::interval_set::*;
 use crate::requirement::*;
 use crate::schedule::*;
-// use crate::task::*;
+use crate::task::*;
 
 pub type Resource = String;
 pub type TaskDetails = serde_json::Value;
 
 pub mod calendar;
+pub mod executors;
 pub mod interval;
 pub mod interval_set;
 pub mod requirement;
