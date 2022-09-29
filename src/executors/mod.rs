@@ -1,6 +1,30 @@
 use super::*;
 pub mod local_executor;
 
+/// Messages for interacting with an Executor
+#[derive(Debug)]
+pub enum ExecutorMessage {
+    /// Validate a set of tasks.
+    /// Errors
+    ///    Returns the vector of task issues
+    ValidateTask {
+        details: serde_json::Value,
+        response: oneshot::Sender<Result<()>>,
+    },
+
+    /// Execute the given task, along with enough information
+    /// Errors
+    ///    Will return `Err` if the tasks are invalid, according to the executor
+    ExecuteTask {
+        details: serde_json::Value,
+        varmap: VarMap,
+        output_options: TaskOutputOptions,
+        response: oneshot::Sender<bool>,
+        kill: oneshot::Receiver<()>,
+    },
+    Stop {},
+}
+
 fn default_bytes() -> usize {
     20480
 }
@@ -39,30 +63,6 @@ impl Default for TaskOutputOptions {
             tail_bytes: default_bytes(),
         }
     }
-}
-
-/// Messages for interacting with an Executor
-#[derive(Debug)]
-pub enum ExecutorMessage {
-    /// Validate a set of tasks.
-    /// Errors
-    ///    Returns the vector of task issues
-    ValidateTask {
-        details: serde_json::Value,
-        response: oneshot::Sender<Result<()>>,
-    },
-
-    /// Execute the given task, along with enough information
-    /// Errors
-    ///    Will return `Err` if the tasks are invalid, according to the executor
-    ExecuteTask {
-        details: serde_json::Value,
-        varmap: VarMap,
-        output_options: TaskOutputOptions,
-        response: oneshot::Sender<TaskAttempt>,
-        kill: oneshot::Receiver<()>,
-    },
-    Stop {},
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

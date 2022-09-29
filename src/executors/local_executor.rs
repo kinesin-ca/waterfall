@@ -246,7 +246,7 @@ pub async fn start_local_executor(
                             ..TaskAttempt::new()
                         },
                     };
-                    response.send(attempt).unwrap();
+                    response.send(attempt.succeeded).unwrap();
                 }));
             }
             Stop {} => {
