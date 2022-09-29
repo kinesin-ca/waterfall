@@ -15,6 +15,7 @@ use crate::interval_set::*;
 use crate::requirement::*;
 use crate::schedule::*;
 use crate::task::*;
+use crate::varmap::*;
 
 pub type Resource = String;
 pub type TaskDetails = serde_json::Value;
@@ -26,3 +27,4 @@ pub mod interval_set;
 pub mod requirement;
 pub mod schedule;
 pub mod task;
+pub mod varmap;
