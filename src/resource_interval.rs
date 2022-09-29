@@ -122,8 +122,13 @@ mod tests {
 
     #[test]
     fn test_subtraction() {
-        let a = ri!("alpha", (13, 18));
-
-        assert_eq!(a - ri!("alpha", (15, 16)), ri!("alpha", (13, 15), (16, 18)));
+        assert_eq!(
+            ri!("alpha", (13, 18)) - ri!("alpha", (15, 16)),
+            ri!("alpha", (13, 15), (16, 18))
+        );
+        assert_eq!(
+            ri!("alpha", (13, 18)) - ResourceInterval::new(),
+            ri!("alpha", (13, 18))
+        );
     }
 }

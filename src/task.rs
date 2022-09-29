@@ -96,10 +96,7 @@ pub struct Task {
 // Really need to rethink this valid_over and scheduling times. When generating
 
 impl Task {
-    pub fn generate_intervals(
-        &self,
-        required: &HashMap<Resource, IntervalSet>,
-    ) -> Result<Vec<Interval>> {
+    pub fn generate_intervals(&self, required: &ResourceInterval) -> Result<Vec<Interval>> {
         // Ensure that all intervals that are required are provided by this instance
         let reqs: Vec<IntervalSet> = self
             .provides
@@ -147,7 +144,7 @@ impl Task {
 
     /// Returns true if this task can provide any resource that isn't currently available
     /// as of the specified time
-    pub fn is_needed(&self, time: &DateTime<Tz>, available: &HashMap<String, IntervalSet>) -> bool {
+    pub fn is_needed(&self, time: &DateTime<Tz>, available: &ResourceInterval) -> bool {
         let end_dt = time.with_timezone(&Utc);
         let horizon_is = self
             .valid_over
@@ -165,18 +162,14 @@ impl Task {
     }
 
     /// Returns true if all requirements are satisfied
-    pub fn can_run(&self, time: DateTime<Utc>, available: &HashMap<String, IntervalSet>) -> bool {
+    pub fn can_run(&self, time: DateTime<Utc>, available: &ResourceInterval) -> bool {
         let local_time = time.with_timezone(&self.timezone);
         self.requires
             .iter()
             .all(|req| req.is_satisfied(&local_time, &self.schedule, available))
     }
 
-    pub fn can_be_satisfied(
-        &self,
-        time: DateTime<Utc>,
-        available: &HashMap<String, IntervalSet>,
-    ) -> bool {
+    pub fn can_be_satisfied(&self, time: DateTime<Utc>, available: &ResourceInterval) -> bool {
         let local_time = time.with_timezone(&self.timezone);
         self.requires
             .iter()
@@ -205,12 +198,29 @@ mod tests {
     use super::*;
     use chrono_tz::America::Halifax;
 
-    macro_rules! isv {
+    macro_rules! intv {
         ( $x:literal, $y:literal ) => {
-            IntervalSet::from(vec![Interval::new(
+            Interval::new(
                 Utc.ymd(2022, 1, $x).and_hms(0, 0, 0),
                 Utc.ymd(2022, 1, $y).and_hms(0, 0, 0),
-            )])
+            )
+        };
+    }
+
+    macro_rules! ri {
+        (
+            $(
+                (
+                    $r:literal,
+                    $(($x:literal, $y:literal)),*
+                )
+            ),*
+        )
+         => {
+            ResourceInterval::from(HashMap::from([$((
+                $r.to_owned(),
+                IntervalSet::from(vec![$(intv!($x, $y)),*]),
+            )),*]))
         };
     }
 
@@ -256,35 +266,23 @@ mod tests {
 
         // No times when out of validity
         let times = task
-            .generate_intervals(&HashMap::from([
-                ("resource_a".to_owned(), isv!(13, 20)),
-                ("resource_b".to_owned(), isv!(13, 20)),
-            ]))
+            .generate_intervals(&ri!(("resource_a", (13, 20)), ("resource_b", (13, 20))))
             .unwrap();
         assert!(times.is_empty());
 
         // Requiring within a valid time range generates times
         let times = task
-            .generate_intervals(&HashMap::from([
-                ("resource_a".to_owned(), isv!(6, 8)),
-                ("resource_b".to_owned(), isv!(6, 8)),
-            ]))
+            .generate_intervals(&ri!(("resource_a", (6, 8)), ("resource_b", (6, 8))))
             .unwrap();
         assert_eq!(times.len(), 6);
 
         // Raise error if unequal requirements
-        let res = task.generate_intervals(&HashMap::from([
-            ("resource_a".to_owned(), isv!(6, 7)),
-            ("resource_b".to_owned(), isv!(6, 8)),
-        ]));
+        let res = task.generate_intervals(&ri!(("resource_a", (6, 7)), ("resource_b", (6, 8))));
         assert!(res.is_err());
 
         // Require that all times generated be within the
         // valid_over
-        let res = task.generate_intervals(&HashMap::from([
-            ("resource_a".to_owned(), isv!(1, 30)),
-            ("resource_b".to_owned(), isv!(1, 30)),
-        ]));
+        let res = task.generate_intervals(&ri!(("resource_a", (1, 30)), ("resource_b", (1, 30))));
         match res {
             Ok(intervals) => {
                 assert!(intervals
