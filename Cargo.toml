@@ -17,3 +17,4 @@ tokio = { version = "1", features = ["full"] }
 users = { version = "0.11", optional = true }
 psutil = { version = "3.2", features = ["process"] }
 sysinfo = "0.23"
+redis = { version = "*", features = ["aio", "tokio-comp"] }
