@@ -18,6 +18,10 @@ impl DerefMut for VarMap {
 }
 
 impl VarMap {
+    pub fn new() -> Self {
+        VarMap(HashMap::new())
+    }
+
     // Derive variables from a given interval
     pub fn from_interval(int: &Interval, tz: Tz) -> Self {
         let start = int.start.with_timezone(&tz);

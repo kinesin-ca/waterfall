@@ -11,6 +11,8 @@ use tokio::time::{sleep, Duration};
 use futures::StreamExt;
 use tokio::io::AsyncReadExt;
 
+type Environment = HashMap<String, Option<String>>;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 enum Cmd {
@@ -37,7 +39,7 @@ struct LocalTaskDetail {
 
     /// Environment variables to set
     #[serde(default)]
-    environment: HashMap<String, Option<String>>,
+    environment: Environment,
 
     /// Timeout in seconds
     #[serde(default)]
@@ -104,6 +106,7 @@ async fn run_task(
     mut stop_rx: oneshot::Receiver<()>,
     output_options: TaskOutputOptions,
     varmap: VarMap,
+    mut env: Environment,
 ) -> Result<TaskAttempt> {
     let mut details = extract_details(&task).unwrap();
     let mut attempt = TaskAttempt::new();
@@ -117,9 +120,10 @@ async fn run_task(
     command.stderr(Stdio::piped());
     command.args(args);
 
-    // Need to convert optional
-    let cmd_env: HashMap<String, String> = details
-        .environment
+    // Build out environment. This takes the initial environment, and will
+    // upsert it with the task details.
+    env.extend(details.environment);
+    let cmd_env: HashMap<String, String> = env
         .iter()
         .filter(|(_, v)| v.is_some())
         .map(|(k, v)| (k.clone(), varmap.apply_to(&v.clone().unwrap())))
@@ -218,6 +222,29 @@ pub async fn start_local_executor(
 ) {
     let mut running = FuturesUnordered::new();
 
+    /*
+    Inherited environment vars
+    */
+
+    let default_vars = [
+        "LANG",
+        "HOSTNAME",
+        "LOGNAME",
+        "USER",
+        "PATH",
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "ALL_PROXY",
+        "FTP_PROXY",
+        "HTTPS_PROXY",
+        "HTTP_PROXY",
+        "NO_PROXY",
+    ];
+    let inherited_env: Environment = default_vars
+        .iter()
+        .map(|envvar| (envvar.to_string(), std::env::var(envvar).ok()))
+        .collect();
+
     while let Some(msg) = exe_msgs.recv().await {
         use ExecutorMessage::{ExecuteTask, Stop, ValidateTask};
         match msg {
@@ -237,8 +264,9 @@ pub async fn start_local_executor(
                 if running.len() == max_parallel {
                     running.next().await;
                 }
+                let env = inherited_env.clone();
                 running.push(tokio::spawn(async move {
-                    let attempt = match run_task(details, kill, output_options, varmap).await {
+                    let attempt = match run_task(details, kill, output_options, varmap, env).await {
                         Ok(attempt) => attempt,
                         Err(e) => TaskAttempt {
                             succeeded: false,
