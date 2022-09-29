@@ -1,5 +1,4 @@
 use super::*;
-use std::convert::From;
 use std::ops::{Add, BitAnd, BitOr, Deref, DerefMut, Not, Sub};
 
 /// A coalescing set of intervals
@@ -159,40 +158,38 @@ impl From<&[Interval]> for IntervalSet {
     }
 }
 
-impl Not for &IntervalSet {
-    type Output = IntervalSet;
-    fn not(self) -> Self::Output {
-        self.complement()
-    }
-}
-impl Add for &IntervalSet {
-    type Output = IntervalSet;
-    fn add(self, other: &IntervalSet) -> Self::Output {
-        self.union(other)
-    }
-}
-impl Sub for &IntervalSet {
-    type Output = IntervalSet;
-    fn sub(self, other: &IntervalSet) -> Self::Output {
-        self.difference(other)
-    }
-}
-impl BitOr for &IntervalSet {
-    type Output = IntervalSet;
-    fn bitor(self, other: &IntervalSet) -> Self::Output {
-        self.union(other)
-    }
-}
-impl BitAnd for &IntervalSet {
-    type Output = IntervalSet;
-    fn bitand(self, other: &IntervalSet) -> Self::Output {
-        self.intersection(other)
-    }
-}
 impl Not for IntervalSet {
-    type Output = IntervalSet;
-    fn not(self) -> Self::Output {
+    type Output = Self;
+    fn not(self) -> Self {
         self.complement()
+    }
+}
+
+impl Add for IntervalSet {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        self.union(&other)
+    }
+}
+
+impl Sub for IntervalSet {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self::Output {
+        self.difference(&other)
+    }
+}
+
+impl BitOr for IntervalSet {
+    type Output = Self;
+    fn bitor(self, other: Self) -> Self {
+        self.union(&other)
+    }
+}
+
+impl BitAnd for IntervalSet {
+    type Output = Self;
+    fn bitand(self, other: Self) -> Self {
+        self.intersection(&other)
     }
 }
 

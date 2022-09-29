@@ -157,7 +157,7 @@ impl Task {
             )]));
         self.provides.iter().all(|res| {
             if let Some(is) = available.get(res) {
-                !(&horizon_is - is).is_empty()
+                !(horizon_is.difference(is)).is_empty()
             } else {
                 false
             }
