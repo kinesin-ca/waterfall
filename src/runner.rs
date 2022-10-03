@@ -298,7 +298,10 @@ impl Runner {
                     let task = self.tasks.get(&task_name).unwrap();
                     action.state = ActionState::Completed;
                     for res in &task.provides {
-                        self.current.get_mut(res).unwrap().insert(action.interval);
+                        self.current
+                            .entry(res.clone())
+                            .or_insert(IntervalSet::new())
+                            .insert(action.interval);
                     }
                     self.queue_actions();
                 }
