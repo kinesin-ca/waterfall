@@ -5,7 +5,7 @@ use std::ops::{Add, Deref, DerefMut, Sub};
 /// represent where a resource is available, or where it's required
 /// Resources are independent, so overlaps between the
 /// interval sets are possible.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ResourceInterval(HashMap<Resource, IntervalSet>);
 
 impl ResourceInterval {
@@ -61,9 +61,9 @@ impl From<&HashMap<Resource, IntervalSet>> for ResourceInterval {
     }
 }
 
-impl Add for ResourceInterval {
+impl<'a, 'b> Add<&'b ResourceInterval> for &'a ResourceInterval {
     type Output = ResourceInterval;
-    fn add(self, other: ResourceInterval) -> Self::Output {
+    fn add(self, other: &'b ResourceInterval) -> Self::Output {
         let res: HashMap<Resource, IntervalSet> =
             other.0.iter().fold(self.0.clone(), |mut acc, (res, is)| {
                 acc.entry(res.clone())
@@ -75,9 +75,9 @@ impl Add for ResourceInterval {
     }
 }
 
-impl Sub for ResourceInterval {
+impl<'a, 'b> Sub<&'b ResourceInterval> for &'a ResourceInterval {
     type Output = ResourceInterval;
-    fn sub(self, other: ResourceInterval) -> Self::Output {
+    fn sub(self, other: &'b ResourceInterval) -> Self::Output {
         let res: HashMap<Resource, IntervalSet> = self
             .0
             .iter()
@@ -124,17 +124,17 @@ mod tests {
     fn test_addition() {
         let a = ri!("alpha", (13, 15));
 
-        assert_eq!(a + ri!("alpha", (15, 18)), ri!("alpha", (13, 18)));
+        assert_eq!(&a + &ri!("alpha", (15, 18)), ri!("alpha", (13, 18)));
     }
 
     #[test]
     fn test_subtraction() {
         assert_eq!(
-            ri!("alpha", (13, 18)) - ri!("alpha", (15, 16)),
+            &ri!("alpha", (13, 18)) - &ri!("alpha", (15, 16)),
             ri!("alpha", (13, 15), (16, 18))
         );
         assert_eq!(
-            ri!("alpha", (13, 18)) - ResourceInterval::new(),
+            &ri!("alpha", (13, 18)) - &ResourceInterval::new(),
             ri!("alpha", (13, 18))
         );
     }

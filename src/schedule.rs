@@ -58,23 +58,7 @@ impl Schedule {
         times
     }
 
-    pub fn interval_utc(&self, dt: DateTime<Utc>, offset: i32) -> Interval {
-        // Need to get the current interval, then offset it
-        let at = dt.with_timezone(&self.timezone);
-        let rt = if self.times.iter().any(|x| *x == at.time()) {
-            at
-        } else {
-            self.prev_time(at)
-        };
-
-        let start = self.offset(rt, offset);
-        Interval::new(
-            start.with_timezone(&Utc),
-            self.next_time(start).with_timezone(&Utc),
-        )
-    }
-
-    pub fn interval(&self, dt: DateTime<Tz>, offset: i32) -> Interval {
+    pub fn interval<T: TimeZone>(&self, dt: DateTime<T>, offset: i32) -> Interval {
         // Need to get the current interval, then offset it
         let at = dt.with_timezone(&self.timezone);
         let rt = if self.times.iter().any(|x| *x == at.time()) {

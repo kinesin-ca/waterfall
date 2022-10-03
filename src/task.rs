@@ -159,18 +159,16 @@ impl Task {
     }
 
     /// Returns true if all requirements are satisfied
-    pub fn can_run(&self, time: DateTime<Utc>, available: &ResourceInterval) -> bool {
-        let local_time = time.with_timezone(&self.timezone);
+    pub fn can_run(&self, interval: Interval, available: &ResourceInterval) -> bool {
         self.requires
             .iter()
-            .all(|req| req.is_satisfied(&local_time, &self.schedule, available))
+            .all(|req| req.is_satisfied(interval, &self.schedule, available))
     }
 
-    pub fn can_be_satisfied(&self, time: DateTime<Utc>, available: &ResourceInterval) -> bool {
-        let local_time = time.with_timezone(&self.timezone);
+    pub fn can_be_satisfied(&self, interval: Interval, available: &ResourceInterval) -> bool {
         self.requires
             .iter()
-            .all(|req| req.can_be_satisfied(&local_time, &self.schedule, available))
+            .all(|req| req.can_be_satisfied(interval, &self.schedule, available))
     }
 
     pub fn up(&self, interval: &Interval) -> Result<HashSet<String>> {

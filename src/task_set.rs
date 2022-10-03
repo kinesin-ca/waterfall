@@ -1,19 +1,8 @@
 use super::*;
+use std::convert::From;
 use std::ops::{Deref, DerefMut};
 
-pub enum ActionState {
-    Queued,
-    Running,
-    Errored,
-    Completed,
-}
-
-pub struct Action {
-    task: String,
-    interval: Interval,
-    state: ActionState,
-}
-
+#[derive(Clone, Debug)]
 pub struct TaskSet(HashMap<String, Task>);
 
 impl TaskSet {
@@ -23,6 +12,11 @@ impl TaskSet {
 
     pub fn coverage(&self) -> Result<ResourceInterval> {
         self.get_state(MAX_TIME)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        self.get_state(MAX_TIME)?;
+        Ok(())
     }
 
     pub fn get_state<T: TimeZone>(&self, time: DateTime<T>) -> Result<ResourceInterval> {
@@ -49,23 +43,6 @@ impl TaskSet {
 
         Ok(res)
     }
-
-    pub fn get_actions(&self, required: &ResourceInterval) -> Result<Vec<Action>> {
-        let mut actions = Vec::new();
-        for (name, task) in self.iter() {
-            let new_actions: Vec<Action> = task
-                .generate_intervals(required)?
-                .into_iter()
-                .map(|interval| Action {
-                    task: name.clone(),
-                    interval,
-                    state: ActionState::Queued,
-                })
-                .collect();
-            actions.extend(new_actions);
-        }
-        Ok(actions)
-    }
 }
 
 impl Deref for TaskSet {
@@ -78,5 +55,11 @@ impl Deref for TaskSet {
 impl DerefMut for TaskSet {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl From<HashMap<String, Task>> for TaskSet {
+    fn from(data: HashMap<String, Task>) -> Self {
+        Self(data)
     }
 }

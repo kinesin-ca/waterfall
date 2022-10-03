@@ -5,7 +5,7 @@ pub trait Satisfiable {
     /// Returns true if the requirement is satisfied now
     fn is_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<String, IntervalSet>,
     ) -> bool;
@@ -14,7 +14,7 @@ pub trait Satisfiable {
     /// in time
     fn can_be_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<String, IntervalSet>,
     ) -> bool;
@@ -31,39 +31,39 @@ pub enum AggregateRequirement {
 impl Satisfiable for AggregateRequirement {
     fn is_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
             AggregateRequirement::All(reqs) => reqs
                 .iter()
-                .all(|x| x.is_satisfied(time, schedule, available)),
+                .all(|x| x.is_satisfied(interval, schedule, available)),
             AggregateRequirement::Any(reqs) => reqs
                 .iter()
-                .any(|x| x.is_satisfied(time, schedule, available)),
+                .any(|x| x.is_satisfied(interval, schedule, available)),
             AggregateRequirement::None(reqs) => !reqs
                 .iter()
-                .any(|x| x.is_satisfied(time, schedule, available)),
+                .any(|x| x.is_satisfied(interval, schedule, available)),
         }
     }
 
     fn can_be_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
             AggregateRequirement::All(reqs) => reqs
                 .iter()
-                .all(|x| x.can_be_satisfied(time, schedule, available)),
+                .all(|x| x.can_be_satisfied(interval, schedule, available)),
             AggregateRequirement::Any(reqs) => reqs
                 .iter()
-                .any(|x| x.can_be_satisfied(time, schedule, available)),
+                .any(|x| x.can_be_satisfied(interval, schedule, available)),
             AggregateRequirement::None(reqs) => !reqs
                 .iter()
-                .any(|x| x.can_be_satisfied(time, schedule, available)),
+                .any(|x| x.can_be_satisfied(interval, schedule, available)),
         }
     }
 }
@@ -78,14 +78,14 @@ pub enum SingleRequirement {
 impl Satisfiable for SingleRequirement {
     fn is_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
             //SingleRequirement::ResourceInterval { .. } => true,
             SingleRequirement::Offset { resource, offset } => {
-                let intv = schedule.interval(*time, *offset);
+                let intv = schedule.interval(interval.end, *offset);
                 match available.get(resource) {
                     Some(is) => is.has_subset(intv),
                     None => false,
@@ -97,13 +97,13 @@ impl Satisfiable for SingleRequirement {
 
     fn can_be_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
             SingleRequirement::Offset { resource, offset } => {
-                let intv = schedule.interval(*time, *offset);
+                let intv = schedule.interval(interval.end, *offset);
                 match available.get(resource) {
                     Some(is) => is.has_subset(intv),
                     None => false,
@@ -124,25 +124,25 @@ pub enum Requirement {
 impl Satisfiable for Requirement {
     fn is_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
-            Requirement::One(req) => req.is_satisfied(time, schedule, available),
-            Requirement::Group(req) => req.is_satisfied(time, schedule, available),
+            Requirement::One(req) => req.is_satisfied(interval, schedule, available),
+            Requirement::Group(req) => req.is_satisfied(interval, schedule, available),
         }
     }
 
     fn can_be_satisfied(
         &self,
-        time: &DateTime<Tz>,
+        interval: Interval,
         schedule: &Schedule,
         available: &HashMap<Resource, IntervalSet>,
     ) -> bool {
         match self {
-            Requirement::One(req) => req.can_be_satisfied(time, schedule, available),
-            Requirement::Group(req) => req.can_be_satisfied(time, schedule, available),
+            Requirement::One(req) => req.can_be_satisfied(interval, schedule, available),
+            Requirement::Group(req) => req.can_be_satisfied(interval, schedule, available),
         }
     }
 }

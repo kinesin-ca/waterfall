@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt::Display;
 use std::ops::{Add, BitAnd, BitOr, Sub};
 
 /*
@@ -63,6 +64,12 @@ impl Interval {
                 end: std::cmp::min(self.end, other.end),
             }
         }
+    }
+}
+
+impl Display for Interval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}]", self.start, self.end)
     }
 }
 
