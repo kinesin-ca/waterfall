@@ -32,6 +32,7 @@ pub mod calendar;
 pub mod executors;
 pub mod interval;
 pub mod interval_set;
+pub mod prelude;
 pub mod requirement;
 pub mod resource_interval;
 pub mod runner;

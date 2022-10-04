@@ -1,10 +1,6 @@
 use clap::Parser;
-use serde::Serialize;
 
-use waterfall::executors::local_executor;
-use waterfall::runner::Runner;
-use waterfall::storage::redis_store;
-use waterfall::world::WorldDefinition;
+use waterfall::prelude::*;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -27,6 +23,7 @@ async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
+    // Parse the config
     let json = std::fs::read_to_string(&args.config)
         .expect(&format!("Unable to open {} for reading", args.config));
 
