@@ -218,11 +218,6 @@ impl Runner {
 
         // Create queue
         let required = target.difference(&self.current);
-        println!("REQ {:?}", required);
-        for (name, task) in self.tasks.iter() {
-            let res = IntervalSet::from(task.generate_intervals(&required).unwrap());
-            println!("GEN ({}): {:?}", name, res);
-        }
         self.queue = self.tasks.iter().fold(Vec::new(), |mut acc, (name, task)| {
             let res: Vec<Action> = task
                 .generate_intervals(&required)
@@ -293,11 +288,6 @@ impl Runner {
 
         // Loop while we can make progress
         while !self.is_done() {
-            println!(
-                "At the top:\nTARGET: {:?}\nCURRENT: {:?}",
-                self.target, self.current
-            );
-
             match self.events.next().await {
                 Some(Ok(WorldEvent::Start)) => {
                     println!("START");
@@ -444,15 +434,6 @@ mod tests {
             }
         }"#;
 
-        /*
-        task_a:
-            declared: [2022-01-01T09:00:00, 2022-01-08T09:00:00]
-            actual:   [2021-12-31T12:00:00, 2022-01-07T12:00:00]
-        task_b:
-            declared: [2022-01-02T09:00:00, 2022-01-07T13:00:00]
-            actual:   [2021-12-31T17:00:00, 2022-01-07T17:00:00]
-        */
-
         // Some Deserializer.
         let world_def: WorldDefinition = serde_json::from_str(json_runner).unwrap();
 
@@ -460,7 +441,7 @@ mod tests {
 
         // Executor
         let (tx, rx) = mpsc::unbounded_channel();
-        let executor = local_executor::start(10, rx);
+        local_executor::start(10, rx);
 
         let mut runner = Runner::new(
             tasks,
