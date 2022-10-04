@@ -9,6 +9,12 @@ pub enum StorageMessage {
         interval: Interval,
         attempt: TaskAttempt,
     },
+    StoreState {
+        state: ResourceInterval,
+    },
+    LoadState {
+        response: oneshot::Sender<ResourceInterval>,
+    },
     Stop {},
 }
 

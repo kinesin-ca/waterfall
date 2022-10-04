@@ -255,9 +255,12 @@ pub async fn start_local_executor(
                 });
             }
             ExecuteTask {
+                task_name,
+                interval,
                 details,
                 varmap,
                 output_options,
+                storage,
                 response,
                 kill,
             } => {
@@ -274,7 +277,15 @@ pub async fn start_local_executor(
                             ..TaskAttempt::new()
                         },
                     };
-                    response.send(attempt.succeeded).unwrap();
+                    let rc = attempt.succeeded;
+                    storage
+                        .send(StorageMessage::StoreAttempt {
+                            task_name,
+                            interval,
+                            attempt,
+                        })
+                        .unwrap();
+                    response.send(rc).unwrap();
                 }));
             }
             Stop {} => {
@@ -284,8 +295,11 @@ pub async fn start_local_executor(
     }
 }
 
-pub fn start(max_parallel: usize, msgs: mpsc::UnboundedReceiver<ExecutorMessage>) {
+pub fn start(
+    max_parallel: usize,
+    msgs: mpsc::UnboundedReceiver<ExecutorMessage>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         start_local_executor(max_parallel, msgs).await;
-    });
+    })
 }

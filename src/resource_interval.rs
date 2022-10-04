@@ -5,7 +5,7 @@ use std::ops::{Add, Deref, DerefMut, Sub};
 /// represent where a resource is available, or where it's required
 /// Resources are independent, so overlaps between the
 /// interval sets are possible.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ResourceInterval(HashMap<Resource, IntervalSet>);
 
 impl ResourceInterval {

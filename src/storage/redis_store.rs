@@ -13,7 +13,7 @@ pub async fn start_redis_storage(
     let mut conn = client.get_async_connection().await?;
 
     while let Some(msg) = msgs.recv().await {
-        use StorageMessage::{Stop, StoreAttempt};
+        use StorageMessage::*;
         match msg {
             StoreAttempt {
                 task_name,
@@ -21,11 +21,19 @@ pub async fn start_redis_storage(
                 attempt,
             } => {
                 let tag = format!("{}_{}_{}", prefix, task_name, interval.end);
-                redis::cmd("PUSH")
-                    .arg(&[&tag, &serde_json::to_string(&attempt).unwrap()])
-                    .query_async(&mut conn)
-                    .await
-                    .unwrap_or(());
+                let payload = serde_json::to_string(&attempt).unwrap();
+                conn.rpush(&tag, &payload).await?;
+            }
+            StoreState { state } => {
+                let tag = format!("{}_state", prefix);
+                let payload = serde_json::to_string(&state).unwrap();
+                conn.set(&tag, &payload).await?;
+            }
+            LoadState { response } => {
+                let tag = format!("{}_state", prefix);
+                let payload: String = conn.get(&tag).await.unwrap_or("{}".to_owned());
+                let is: ResourceInterval = serde_json::from_str(&payload).unwrap();
+                response.send(is).unwrap();
             }
             Stop {} => {
                 break;
@@ -36,10 +44,14 @@ pub async fn start_redis_storage(
     Ok(())
 }
 
-pub fn start(msgs: mpsc::UnboundedReceiver<StorageMessage>, url: String, prefix: String) {
+pub fn start(
+    msgs: mpsc::UnboundedReceiver<StorageMessage>,
+    url: String,
+    prefix: String,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         start_redis_storage(msgs, url, prefix)
             .await
             .expect("Unable to start redis storage");
-    });
+    })
 }

@@ -16,9 +16,12 @@ pub enum ExecutorMessage {
     /// Errors
     ///    Will return `Err` if the tasks are invalid, according to the executor
     ExecuteTask {
+        task_name: String,
+        interval: Interval,
         details: serde_json::Value,
         varmap: VarMap,
         output_options: TaskOutputOptions,
+        storage: mpsc::UnboundedSender<StorageMessage>,
         response: oneshot::Sender<bool>,
         kill: oneshot::Receiver<()>,
     },

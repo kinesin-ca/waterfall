@@ -29,7 +29,7 @@ pub struct Action {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum WorldEvent {
+pub enum RunnerEvent {
     Start,
     TaskFailed {
         task_name: String,
@@ -57,16 +57,17 @@ pub struct Runner {
     queue: Vec<Action>,
     qidx: usize,
 
-    events: FuturesUnordered<tokio::task::JoinHandle<WorldEvent>>,
+    events: FuturesUnordered<tokio::task::JoinHandle<RunnerEvent>>,
 
     last_horizon: DateTime<Utc>,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
+    storage: mpsc::UnboundedSender<StorageMessage>,
 }
 
-fn gen_timeout(timeout: i64) -> tokio::task::JoinHandle<WorldEvent> {
+fn gen_timeout(timeout: i64) -> tokio::task::JoinHandle<RunnerEvent> {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::seconds(timeout).to_std().unwrap()).await;
-        WorldEvent::Timeout
+        RunnerEvent::Timeout
     })
 }
 
@@ -85,20 +86,27 @@ async fn validate_cmd(
 }
 
 async fn run_task(
+    task_name: String,
+    interval: Interval,
     details: serde_json::Value,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
+    storage: mpsc::UnboundedSender<StorageMessage>,
     kill: oneshot::Receiver<()>,
     output_options: &TaskOutputOptions,
     varmap: &VarMap,
 ) -> bool {
+    println!("Running {}/{}", task_name, interval);
     let (response, response_rx) = oneshot::channel();
     executor
         .send(ExecutorMessage::ExecuteTask {
+            task_name,
+            interval,
             details,
             output_options: output_options.clone(),
             varmap: varmap.clone(),
             response,
             kill,
+            storage,
         })
         .unwrap();
     response_rx.await.unwrap()
@@ -113,12 +121,16 @@ async fn up_task(
     check: Option<TaskDetails>,
     output_options: TaskOutputOptions,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
-) -> WorldEvent {
+    storage: mpsc::UnboundedSender<StorageMessage>,
+) -> RunnerEvent {
     if let Some(check_cmd) = check.clone() {
         let (subkill, subkill_rx) = oneshot::channel();
         let succeeded = run_task(
+            task_name.clone(),
+            interval,
             check_cmd.clone(),
             executor.clone(),
+            storage.clone(),
             subkill_rx,
             &output_options,
             &varmap,
@@ -127,7 +139,7 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            return WorldEvent::TaskCompleted {
+            return RunnerEvent::TaskCompleted {
                 task_name,
                 interval,
             };
@@ -136,9 +148,19 @@ async fn up_task(
 
     // UP
     let (subkill, subkill_rx) = oneshot::channel();
-    let succeeded = run_task(up, executor.clone(), subkill_rx, &output_options, &varmap).await;
+    let succeeded = run_task(
+        task_name.clone(),
+        interval,
+        up,
+        executor.clone(),
+        storage.clone(),
+        subkill_rx,
+        &output_options,
+        &varmap,
+    )
+    .await;
     if !succeeded {
-        return WorldEvent::TaskFailed {
+        return RunnerEvent::TaskFailed {
             task_name,
             interval,
         };
@@ -148,8 +170,11 @@ async fn up_task(
     if let Some(check_cmd) = check {
         let (subkill, subkill_rx) = oneshot::channel();
         let succeeded = run_task(
+            task_name.clone(),
+            interval,
             check_cmd.clone(),
             executor.clone(),
+            storage.clone(),
             subkill_rx,
             &output_options,
             &varmap,
@@ -158,18 +183,18 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            WorldEvent::TaskCompleted {
+            RunnerEvent::TaskCompleted {
                 task_name,
                 interval,
             }
         } else {
-            WorldEvent::TaskFailed {
+            RunnerEvent::TaskFailed {
                 task_name,
                 interval,
             }
         }
     } else {
-        WorldEvent::TaskCompleted {
+        RunnerEvent::TaskCompleted {
             task_name,
             interval,
         }
@@ -181,6 +206,7 @@ impl Runner {
         tasks: TaskSet,
         vars: VarMap,
         executor: mpsc::UnboundedSender<ExecutorMessage>,
+        storage: mpsc::UnboundedSender<StorageMessage>,
         output_options: TaskOutputOptions,
     ) -> Result<Self> {
         for tdef in tasks.values() {
@@ -193,6 +219,12 @@ impl Runner {
             }
         }
 
+        let (response, rx) = oneshot::channel();
+        storage
+            .send(StorageMessage::LoadState { response })
+            .unwrap();
+        let current = rx.await.unwrap();
+
         let end_state = tasks.coverage()?;
         let mut runner = Runner {
             tasks,
@@ -200,12 +232,13 @@ impl Runner {
             output_options,
             end_state,
             target: ResourceInterval::new(),
-            current: ResourceInterval::new(),
+            current,
             queue: Vec::new(),
             qidx: 0,
             events: FuturesUnordered::new(),
             last_horizon: DateTime::<Utc>::MIN_UTC,
             executor,
+            storage,
         };
 
         runner.tick()?;
@@ -218,6 +251,8 @@ impl Runner {
 
         // Create queue
         let required = target.difference(&self.current);
+        println!("CUR: {:?}", self.current);
+        println!("REQ: {:?}", required);
         self.queue = self.tasks.iter().fold(Vec::new(), |mut acc, (name, task)| {
             let res: Vec<Action> = task
                 .generate_intervals(&required)
@@ -247,7 +282,6 @@ impl Runner {
                     .can_be_satisfied(act.interval, &target)
             })
             .fold(HashSet::new(), |mut acc, a| {
-                println!("Task cannot be satisfied: {:?}", a);
                 acc.insert(a.task.clone());
                 acc
             });
@@ -279,39 +313,37 @@ impl Runner {
     }
 
     // We'll be using channels for running
-    pub async fn run(&mut self, stop: oneshot::Receiver<WorldEvent>) {
+    pub async fn run(&mut self, stop: oneshot::Receiver<RunnerEvent>) {
         self.events.push(tokio::spawn(async move {
             stop.await.expect("Unable to get stop");
-            WorldEvent::Stop
+            RunnerEvent::Stop
         }));
         self.queue_actions();
 
         // Loop while we can make progress
         while !self.is_done() {
             match self.events.next().await {
-                Some(Ok(WorldEvent::Start)) => {
-                    println!("START");
+                Some(Ok(RunnerEvent::Start)) => {
                     self.queue_actions();
                 }
-                Some(Ok(WorldEvent::Stop)) => {
-                    println!("Stop");
+                Some(Ok(RunnerEvent::Stop)) => {
                     break;
                 }
-                Some(Ok(WorldEvent::Timeout)) => {
-                    println!("Timeout");
+                Some(Ok(RunnerEvent::Timeout)) => {
                     self.queue_actions();
                 }
-                Some(Ok(WorldEvent::TaskFailed {
+                Some(Ok(RunnerEvent::TaskFailed {
                     task_name,
                     interval,
                 })) => {
                     println!("FAILED: {} / {}", task_name, interval);
                     println!("Well that sucks");
                 }
-                Some(Ok(WorldEvent::TaskCompleted {
+                Some(Ok(RunnerEvent::TaskCompleted {
                     task_name,
                     interval,
                 })) => {
+                    println!("Completing {}/{}", task_name, interval);
                     let action = self
                         .queue
                         .iter_mut()
@@ -325,6 +357,11 @@ impl Runner {
                             .or_insert(IntervalSet::new())
                             .insert(action.interval);
                     }
+                    self.storage
+                        .send(StorageMessage::StoreState {
+                            state: self.current.clone(),
+                        })
+                        .unwrap();
                     self.queue_actions();
                 }
                 Some(Err(e)) => {
@@ -363,6 +400,7 @@ impl Runner {
             let check = task.check.clone();
             let output_options = self.output_options.clone();
             let exe = self.executor.clone();
+            let storage = self.storage.clone();
             self.events.push(tokio::spawn(async move {
                 up_task(
                     task_name.clone(),
@@ -373,6 +411,7 @@ impl Runner {
                     check,
                     output_options,
                     exe,
+                    storage,
                 )
                 .await
             }));
@@ -441,12 +480,21 @@ mod tests {
 
         // Executor
         let (tx, rx) = mpsc::unbounded_channel();
-        local_executor::start(10, rx);
+        let executor = local_executor::start(10, rx);
+
+        // Storage
+        let (storage_tx, storage_rx) = mpsc::unbounded_channel();
+        let storage = redis_store::start(
+            storage_rx,
+            "redis://localhost".to_owned(),
+            "world_test".to_owned(),
+        );
 
         let mut runner = Runner::new(
             tasks,
             world_def.variables,
             tx.clone(),
+            storage_tx.clone(),
             world_def.output_options,
         )
         .await
@@ -456,6 +504,10 @@ mod tests {
         runner.run(wrx).await;
 
         tx.send(ExecutorMessage::Stop {}).unwrap();
+        executor.await.unwrap();
+
+        storage_tx.send(StorageMessage::Stop {}).unwrap();
+        storage.await.unwrap();
 
         assert_eq!(1, 1);
     }
