@@ -43,6 +43,7 @@ impl Deref for ResourceInterval {
         &self.0
     }
 }
+
 impl DerefMut for ResourceInterval {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -61,9 +62,9 @@ impl From<&HashMap<Resource, IntervalSet>> for ResourceInterval {
     }
 }
 
-impl<'a, 'b> Add<&'b ResourceInterval> for &'a ResourceInterval {
+impl Add for &ResourceInterval {
     type Output = ResourceInterval;
-    fn add(self, other: &'b ResourceInterval) -> Self::Output {
+    fn add(self, other: &ResourceInterval) -> Self::Output {
         let res: HashMap<Resource, IntervalSet> =
             other.0.iter().fold(self.0.clone(), |mut acc, (res, is)| {
                 acc.entry(res.clone())
@@ -75,9 +76,9 @@ impl<'a, 'b> Add<&'b ResourceInterval> for &'a ResourceInterval {
     }
 }
 
-impl<'a, 'b> Sub<&'b ResourceInterval> for &'a ResourceInterval {
+impl Sub for &ResourceInterval {
     type Output = ResourceInterval;
-    fn sub(self, other: &'b ResourceInterval) -> Self::Output {
+    fn sub(self, other: &ResourceInterval) -> Self::Output {
         let res: HashMap<Resource, IntervalSet> = self
             .0
             .iter()
@@ -89,6 +90,12 @@ impl<'a, 'b> Sub<&'b ResourceInterval> for &'a ResourceInterval {
             })
             .collect();
         ResourceInterval(res)
+    }
+}
+
+impl AsRef<ResourceInterval> for ResourceInterval {
+    fn as_ref(&self) -> &ResourceInterval {
+        self
     }
 }
 
