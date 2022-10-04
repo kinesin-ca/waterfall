@@ -49,6 +49,8 @@ pub struct Runner {
     vars: VarMap,
     output_options: TaskOutputOptions,
 
+    // States
+    end_state: ResourceInterval,
     target: ResourceInterval,
     current: ResourceInterval,
 
@@ -191,13 +193,13 @@ impl Runner {
             }
         }
 
-        let target = tasks.get_state(Utc::now())?;
-
+        let end_state = tasks.coverage()?;
         let mut runner = Runner {
             tasks,
             vars,
             output_options,
-            target,
+            end_state,
+            target: ResourceInterval::new(),
             current: ResourceInterval::new(),
             queue: Vec::new(),
             qidx: 0,
@@ -206,46 +208,76 @@ impl Runner {
             executor,
         };
 
-        // Create queue
-        let required = runner.target.difference(&runner.current);
-        runner.queue = runner
-            .tasks
-            .iter()
-            .fold(Vec::new(), |mut acc, (name, task)| {
-                let res: Vec<Action> = task
-                    .generate_intervals(&required)
-                    .unwrap()
-                    .into_iter()
-                    .map({
-                        |interval| Action {
-                            task: name.clone(),
-                            interval,
-                            state: ActionState::Queued,
-                        }
-                    })
-                    .collect();
-                acc.extend(res);
-                acc
-            });
+        runner.tick()?;
 
-        let unsatisfied = runner
+        Ok(runner)
+    }
+
+    pub fn tick(&mut self) -> Result<()> {
+        let target = self.tasks.get_state(Utc::now())?;
+
+        // Create queue
+        let required = target.difference(&self.current);
+        println!("REQ {:?}", required);
+        for (name, task) in self.tasks.iter() {
+            let res = IntervalSet::from(task.generate_intervals(&required).unwrap());
+            println!("GEN ({}): {:?}", name, res);
+        }
+        self.queue = self.tasks.iter().fold(Vec::new(), |mut acc, (name, task)| {
+            let res: Vec<Action> = task
+                .generate_intervals(&required)
+                .unwrap()
+                .into_iter()
+                .map({
+                    |interval| Action {
+                        task: name.clone(),
+                        interval,
+                        state: ActionState::Queued,
+                    }
+                })
+                .collect();
+            acc.extend(res);
+            acc
+        });
+
+        // Ensure that all actions can be satisfied
+        let unsatisfied = self
             .queue
             .iter()
             .filter(|act| {
-                !runner
+                !self
                     .tasks
                     .get(&act.task)
                     .unwrap()
-                    .can_be_satisfied(act.interval, &runner.target)
+                    .can_be_satisfied(act.interval, &target)
             })
             .fold(HashSet::new(), |mut acc, a| {
-                println!("INVALID: {:?}", a);
+                println!("Task cannot be satisfied: {:?}", a);
                 acc.insert(a.task.clone());
                 acc
             });
 
+        // Ensure current +
+        let mut result_state = self.current.clone();
+        for action in &self.queue {
+            for res in &self.tasks.get(&action.task).unwrap().provides {
+                result_state
+                    .entry(res.clone())
+                    .or_insert(IntervalSet::new())
+                    .insert(action.interval);
+            }
+        }
+        if result_state != target {
+            return Err(anyhow!(
+                "Actions generated produce\n\t{:?}\nExpected\n\t{:?}",
+                result_state,
+                target
+            ));
+        }
+
         if unsatisfied.is_empty() {
-            Ok(runner)
+            self.target = target;
+            Ok(())
         } else {
             Err(anyhow!("Tasks {:?} cannot complete as the target state does not provide required resources", unsatisfied))
         }
@@ -361,7 +393,7 @@ impl Runner {
     }
 
     fn is_done(&self) -> bool {
-        self.target == self.current
+        self.end_state == self.current
     }
 }
 

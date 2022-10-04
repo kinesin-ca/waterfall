@@ -26,8 +26,11 @@ impl Schedule {
             return Vec::new();
         }
 
-        let st = interval.start.with_timezone(&self.timezone);
-        let et = interval.end.with_timezone(&self.timezone);
+        let st = self.interval(interval.start, 0).start;
+        let et = self.interval(interval.end, 0).end;
+
+        //let st = interval.start.with_timezone(&self.timezone);
+        //let et = interval.end.with_timezone(&self.timezone);
 
         let mut date = self.calendar.prev(st.date().naive_local());
         let end_date = self.calendar.next(et.date().succ().naive_local());
@@ -58,19 +61,24 @@ impl Schedule {
         times
     }
 
+    /// Given a timestamp, return the interval that contains it
     pub fn interval<T: TimeZone>(&self, dt: DateTime<T>, offset: i32) -> Interval {
         // Need to get the current interval, then offset it
         let at = dt.with_timezone(&self.timezone);
-        let rt = if self.times.iter().any(|x| *x == at.time()) {
+
+        // If the time is at an edge
+        let rt = if self.times.iter().any(|x| *x == at.time())
+            && self.calendar.includes(at.date().naive_local())
+        {
             at
         } else {
-            self.prev_time(at)
+            self.next_time(at)
         };
 
-        let start = self.offset(rt, offset);
+        let end = self.offset(rt, offset);
         Interval::new(
-            start.with_timezone(&Utc),
-            self.next_time(start).with_timezone(&Utc),
+            self.prev_time(end).with_timezone(&Utc),
+            end.with_timezone(&Utc),
         )
     }
 
@@ -125,8 +133,9 @@ impl Schedule {
         self.timezone.from_local_datetime(&time).unwrap()
     }
 
-    /// Given a timestamp, return the scheduled time `offset`
-    pub fn offset(&self, mut dt: DateTime<Tz>, offset: i32) -> DateTime<Tz> {
+    // Given a timestamp, return the scheduled time `offset`
+    // A bit dangerous, providing an offset of 0
+    fn offset(&self, mut dt: DateTime<Tz>, offset: i32) -> DateTime<Tz> {
         if offset > 0 {
             for _ in 0..offset {
                 dt = self.next_time(dt);
@@ -356,6 +365,21 @@ mod tests {
             ],
             timezone,
         };
+
+        // Weekends are correct
+        assert_eq!(
+            sched.interval(timezone.ymd(2022, 1, 1).and_hms(9, 0, 0), 0),
+            Interval::new(
+                timezone
+                    .ymd(2021, 12, 31)
+                    .and_hms(11, 30, 0)
+                    .with_timezone(&Utc),
+                timezone
+                    .ymd(2022, 1, 3)
+                    .and_hms(10, 30, 0)
+                    .with_timezone(&Utc)
+            )
+        );
 
         // prev and next are reversible
         let dt = timezone.ymd(2022, 1, 3).and_hms(11, 0, 0);

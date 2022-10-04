@@ -43,7 +43,8 @@ impl TaskDefinition {
     pub fn to_task(&self, calendar: &Calendar) -> Task {
         let schedule = Schedule::new(calendar.clone(), self.times.clone(), self.timezone);
         /*
-            The valid_{from,to} interval must be aligned to the actual schedule
+            The valid_{from,to} interval must be aligned to the actual schedule.
+            They will be adjusted to include any interval who's
         */
         let start = schedule
             .interval(
@@ -110,7 +111,7 @@ impl Task {
             })
             .collect();
 
-        if reqs.is_empty() {
+        let res = if reqs.is_empty() {
             Ok(Vec::new())
         } else {
             let ris = &reqs[0];
@@ -129,7 +130,8 @@ impl Task {
                     acc
                 }))
             }
-        }
+        };
+        res
     }
 
     pub fn validity(&self, max_time: DateTime<Utc>) -> IntervalSet {
@@ -191,7 +193,7 @@ impl Task {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono_tz::America::Halifax;
+    use chrono_tz::America::{Halifax, New_York};
 
     macro_rules! intv {
         ( $x:literal, $y:literal ) => {
@@ -289,6 +291,14 @@ mod tests {
             }
         };
 
+        // Require that all times generated be within the
+        // valid_over
+        let mut exact = ResourceInterval::new();
+        exact.insert(&"resource_a".to_owned(), &task.valid_over.clone());
+        exact.insert(&"resource_b".to_owned(), &task.valid_over.clone());
+        let res = IntervalSet::from(task.generate_intervals(&exact).unwrap());
+        assert_eq!(res, task.valid_over);
+
         // Ensure that the intervals generated over the valid period
         // exactly cover the valid period
         let mut theoretical = ResourceInterval::new();
@@ -296,5 +306,64 @@ mod tests {
         theoretical.insert(&"resource_b".to_owned(), &task.valid_over);
         let generated = IntervalSet::from(task.generate_intervals(&theoretical).unwrap());
         assert_eq!(task.valid_over, generated);
+    }
+
+    #[test]
+    fn check_task_valid_over() {
+        let task_json = r#"
+        {
+            "up": "/usr/bin/touch /tmp/a_${yyyymmdd}_${hhmmss}",
+            "down": "/usr/bin/rm /tmp/a_${yyyymmdd}_${hhmmss}",
+            "check": "/usr/bin/test -e /tmp/a_${yyyymmdd}_${hhmmss}",
+            "provides": [
+                "resource_a",
+                "resource_b"
+            ],
+            "requires": [
+                { "resource": "alpha", "offset": 0 },
+                { "resource": "beta", "offset": -1 }
+            ],
+            "calendar_name": "std",
+            "times": [ "17:00:00" ],
+            "timezone": "America/New_York",
+            "valid_from": "2022-01-04T09:00:00",
+            "valid_to": "2022-01-07T00:00:00"
+        }
+        "#;
+
+        let cal = Calendar::new();
+        {
+            let task_def: TaskDefinition = serde_json::from_str(task_json).unwrap();
+            let task = task_def.to_task(&cal);
+
+            // Assert the valid interval is correct
+            assert_eq!(
+                task.valid_over,
+                IntervalSet::from(vec![Interval::new(
+                    New_York.ymd(2022, 1, 3).and_hms(17, 0, 0),
+                    New_York.ymd(2022, 1, 6).and_hms(17, 0, 0)
+                )])
+            );
+        }
+
+        // Another test with different times
+        {
+            let mut task_def: TaskDefinition = serde_json::from_str(task_json).unwrap();
+
+            task_def.times = vec![NaiveTime::from_hms(9, 0, 0), NaiveTime::from_hms(12, 0, 0)];
+            task_def.valid_from = NaiveDate::from_ymd(2022, 1, 1).and_hms(9, 0, 0);
+            task_def.valid_to = Some(NaiveDate::from_ymd(2022, 1, 7).and_hms(17, 0, 0));
+
+            let task = task_def.to_task(&cal);
+
+            // Assert the valid interval is correct
+            assert_eq!(
+                task.valid_over,
+                IntervalSet::from(vec![Interval::new(
+                    New_York.ymd(2021, 12, 31).and_hms(12, 0, 0),
+                    New_York.ymd(2022, 1, 7).and_hms(12, 0, 0)
+                )])
+            );
+        }
     }
 }

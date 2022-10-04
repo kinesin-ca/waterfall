@@ -31,7 +31,7 @@ impl ResourceInterval {
         ResourceInterval(res)
     }
 
-    pub fn difference(&mut self, other: &ResourceInterval) -> Self {
+    pub fn difference(&self, other: &ResourceInterval) -> Self {
         let res: HashMap<Resource, IntervalSet> = self
             .0
             .iter()
@@ -70,45 +70,6 @@ impl From<&HashMap<Resource, IntervalSet>> for ResourceInterval {
         ResourceInterval(hm.clone())
     }
 }
-
-/*
-impl Add for &ResourceInterval {
-    type Output = ResourceInterval;
-    fn add(self, other: &ResourceInterval) -> Self::Output {
-        let res: HashMap<Resource, IntervalSet> =
-            other.0.iter().fold(self.0.clone(), |mut acc, (res, is)| {
-                acc.entry(res.clone())
-                    .or_insert(IntervalSet::new())
-                    .merge(is);
-                acc
-            });
-        ResourceInterval(res)
-    }
-}
-
-impl Sub for &ResourceInterval {
-    type Output = ResourceInterval;
-    fn sub(self, other: &ResourceInterval) -> Self::Output {
-        let res: HashMap<Resource, IntervalSet> = self
-            .0
-            .iter()
-            .map(|(res, is)| {
-                (
-                    res.clone(),
-                    is.difference(other.get(res).unwrap_or(&IntervalSet::new())),
-                )
-            })
-            .collect();
-        ResourceInterval(res)
-    }
-}
-
-impl AsRef<Self> for ResourceInterval {
-    fn as_ref(&self) -> &Self {
-        self
-    }
-}
-*/
 
 #[cfg(test)]
 mod tests {
