@@ -207,7 +207,7 @@ impl Runner {
         };
 
         // Create queue
-        let required = &runner.target - &runner.current;
+        let required = runner.target.difference(&runner.current);
         runner.queue = runner
             .tasks
             .iter()

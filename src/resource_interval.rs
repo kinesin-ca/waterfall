@@ -20,20 +20,29 @@ impl ResourceInterval {
             .merge(intervals);
     }
 
-    pub fn union(&mut self, other: ResourceInterval) {
-        for (res, is) in other.iter() {
-            self.0
-                .entry(res.clone())
-                .or_insert(IntervalSet::new())
-                .merge(is);
-        }
+    pub fn union(&self, other: &ResourceInterval) -> Self {
+        let res: HashMap<Resource, IntervalSet> =
+            other.0.iter().fold(self.0.clone(), |mut acc, (res, is)| {
+                acc.entry(res.clone())
+                    .or_insert(IntervalSet::new())
+                    .merge(is);
+                acc
+            });
+        ResourceInterval(res)
     }
 
-    pub fn subtract(&mut self, other: ResourceInterval) {
-        for (res, is) in other.iter() {
-            let avail = self.0.entry(res.clone()).or_insert(IntervalSet::new());
-            *avail = avail.difference(is);
-        }
+    pub fn difference(&mut self, other: &ResourceInterval) -> Self {
+        let res: HashMap<Resource, IntervalSet> = self
+            .0
+            .iter()
+            .map(|(res, is)| {
+                (
+                    res.clone(),
+                    is.difference(other.get(res).unwrap_or(&IntervalSet::new())),
+                )
+            })
+            .collect();
+        ResourceInterval(res)
     }
 }
 
@@ -62,6 +71,7 @@ impl From<&HashMap<Resource, IntervalSet>> for ResourceInterval {
     }
 }
 
+/*
 impl Add for &ResourceInterval {
     type Output = ResourceInterval;
     fn add(self, other: &ResourceInterval) -> Self::Output {
@@ -93,11 +103,12 @@ impl Sub for &ResourceInterval {
     }
 }
 
-impl AsRef<ResourceInterval> for ResourceInterval {
-    fn as_ref(&self) -> &ResourceInterval {
+impl AsRef<Self> for ResourceInterval {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {
@@ -131,17 +142,17 @@ mod tests {
     fn test_addition() {
         let a = ri!("alpha", (13, 15));
 
-        assert_eq!(&a + &ri!("alpha", (15, 18)), ri!("alpha", (13, 18)));
+        assert_eq!(a.union(&ri!("alpha", (15, 18))), ri!("alpha", (13, 18)));
     }
 
     #[test]
     fn test_subtraction() {
         assert_eq!(
-            &ri!("alpha", (13, 18)) - &ri!("alpha", (15, 16)),
+            ri!("alpha", (13, 18)).difference(&ri!("alpha", (15, 16))),
             ri!("alpha", (13, 15), (16, 18))
         );
         assert_eq!(
-            &ri!("alpha", (13, 18)) - &ResourceInterval::new(),
+            ri!("alpha", (13, 18)).difference(&ResourceInterval::new()),
             ri!("alpha", (13, 18))
         );
     }
