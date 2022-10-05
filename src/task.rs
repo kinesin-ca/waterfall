@@ -99,7 +99,7 @@ pub struct TaskDefinition {
 }
 
 impl TaskDefinition {
-    pub fn to_task(&self, calendar: &Calendar) -> Task {
+    pub fn to_task(&self, name: &str, calendar: &Calendar) -> Task {
         let schedule = Schedule::new(calendar.clone(), self.times.clone(), self.timezone);
         /*
             The valid_{from,to} interval must be aligned to the actual schedule.
@@ -111,6 +111,12 @@ impl TaskDefinition {
                 0,
             )
             .start;
+
+        let provides = if self.provides.is_empty() {
+            HashSet::from([name.to_owned()])
+        } else {
+            self.provides.clone()
+        };
 
         let end = match self.valid_to {
             Some(nt) => self.timezone.from_local_datetime(&nt).unwrap(),
@@ -124,7 +130,7 @@ impl TaskDefinition {
             down: self.down.clone(),
             check: self.check.clone(),
 
-            provides: self.provides.clone(),
+            provides,
             requires: self.requires.clone(),
 
             schedule: schedule,
@@ -393,7 +399,7 @@ mod tests {
         let cal = Calendar::new();
         {
             let task_def: TaskDefinition = serde_json::from_str(task_json).unwrap();
-            let task = task_def.to_task(&cal);
+            let task = task_def.to_task("task", &cal);
 
             // Assert the valid interval is correct
             assert_eq!(
@@ -413,7 +419,7 @@ mod tests {
             task_def.valid_from = NaiveDate::from_ymd(2022, 1, 1).and_hms(9, 0, 0);
             task_def.valid_to = Some(NaiveDate::from_ymd(2022, 1, 7).and_hms(17, 0, 0));
 
-            let task = task_def.to_task(&cal);
+            let task = task_def.to_task("task", &cal);
 
             // Assert the valid interval is correct
             assert_eq!(

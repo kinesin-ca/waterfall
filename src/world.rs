@@ -32,7 +32,7 @@ impl WorldDefinition {
             .map(|(tn, td)| {
                 (
                     tn.clone(),
-                    td.to_task(self.calendars.get(&td.calendar_name).unwrap()),
+                    td.to_task(tn, self.calendars.get(&td.calendar_name).unwrap()),
                 )
             })
             .collect();
