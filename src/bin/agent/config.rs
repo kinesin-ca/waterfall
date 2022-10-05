@@ -51,7 +51,7 @@ pub struct GlobalConfig {
     pub ip: String,
     pub port: u32,
     pub resources: TaskResources,
-    pub tracker: mpsc::UnboundedSender<TrackerMessage>,
+    pub storage: mpsc::UnboundedSender<StorageMessage>,
     pub executor: mpsc::UnboundedSender<ExecutorMessage>,
 }
 
@@ -66,14 +66,14 @@ impl GlobalConfig {
         local_executor::start(*workers as usize, exe_rx);
 
         // Tracker
-        let (tracker, trx) = mpsc::unbounded_channel();
-        noop_tracker::start(trx);
+        let (storage, trx) = mpsc::unbounded_channel();
+        waterfall::storage::noop::start(trx);
 
         GlobalConfig {
             ip: spec.ip.clone(),
             port: spec.port,
             resources: spec.resources.clone(),
-            tracker,
+            storage,
             executor,
         }
     }

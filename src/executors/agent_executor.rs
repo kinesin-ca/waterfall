@@ -105,9 +105,9 @@ fn validate_task(details: &TaskDetails, max_capacities: &[TaskResources]) -> Res
 /// Contains specifics on how to run a local task
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TaskSubmission {
-    details: TaskDetails,
-    varmap: VarMap,
-    output_options: TaskOutputOptions,
+    pub details: TaskDetails,
+    pub varmap: VarMap,
+    pub output_options: TaskOutputOptions,
 }
 
 async fn submit_task(

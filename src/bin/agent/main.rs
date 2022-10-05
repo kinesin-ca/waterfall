@@ -27,16 +27,16 @@ async fn submit_task(
 ) -> impl Responder {
     let (response, rx) = oneshot::channel();
 
-    let submission = data.into_inner();
+    let submission = details.into_inner();
 
-    let trx = data.tracker.clone();
-
+    let (_, kill) = oneshot::channel();
     data.executor
         .send(ExecutorMessage::ExecuteTask {
             details: submission.details,
             output_options: submission.output_options,
             varmap: submission.varmap,
             response,
+            kill,
         })
         .unwrap();
 
