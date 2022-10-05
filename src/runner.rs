@@ -214,6 +214,7 @@ impl Runner {
         executor: mpsc::UnboundedSender<ExecutorMessage>,
         storage: mpsc::UnboundedSender<StorageMessage>,
         output_options: TaskOutputOptions,
+        force_check: bool,
     ) -> Result<Self> {
         for tdef in tasks.values() {
             validate_cmd(executor.clone(), tdef.up.clone()).await?;
@@ -225,11 +226,15 @@ impl Runner {
             }
         }
 
-        let (response, rx) = oneshot::channel();
-        storage
-            .send(StorageMessage::LoadState { response })
-            .unwrap();
-        let current = rx.await.unwrap();
+        let current = if force_check {
+            let (response, rx) = oneshot::channel();
+            storage
+                .send(StorageMessage::LoadState { response })
+                .unwrap();
+            rx.await.unwrap()
+        } else {
+            ResourceInterval::new()
+        };
 
         let end_state = tasks.coverage()?;
         let mut runner = Runner {
@@ -489,7 +494,7 @@ mod tests {
 
         // Storage
         let (storage_tx, storage_rx) = mpsc::unbounded_channel();
-        let storage = redis_store::start(
+        let storage = storage::redis::start(
             storage_rx,
             "redis://localhost".to_owned(),
             "world_test".to_owned(),
@@ -501,6 +506,7 @@ mod tests {
             tx.clone(),
             storage_tx.clone(),
             world_def.output_options,
+            true,
         )
         .await
         .unwrap();

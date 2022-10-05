@@ -75,6 +75,10 @@ struct Args {
     /// Enable verbose logging
     #[clap(short, long)]
     verbose: bool,
+
+    /// Force a full re-check
+    #[clap(short, long)]
+    force_recheck: bool,
 }
 
 /*
@@ -122,6 +126,7 @@ async fn main() -> std::io::Result<()> {
         exe_tx.clone(),
         storage_tx.clone(),
         world_def.output_options,
+        args.force_recheck,
     )
     .await
     .unwrap();
