@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use chrono_tz::Tz;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::{mpsc, oneshot};

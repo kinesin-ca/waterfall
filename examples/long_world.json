@@ -1,0 +1,39 @@
+{
+  "variables": {
+    "HOME": "/tmp/world_test"
+  },
+  "calendars": {
+    "std": { "mask": [ "Mon", "Tue", "Wed", "Thu", "Fri" ] }
+  },
+  "tasks": {
+    "task_a": {
+      "up": { "command": "/usr//bin/touch ${HOME}/task_a_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+      "down": { "command": "/bin/rm ${HOME}/task_a_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+      "check": { "command": "/bin/test -e ${HOME}/task_a_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+
+      "provides": [ "task_a" ],
+
+      "calendar_name": "std",
+      "times": [ "09:00:00", "12:00:00"],
+      "timezone": "America/New_York",
+
+      "valid_from": "2022-01-01T09:00:00",
+      "valid_to": "2023-01-08T09:00:00"
+    },
+    "task_b": {
+      "up": { "command": "/usr//bin/touch ${HOME}/task_b_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+      "down": { "command": "/bin/rm ${HOME}/task_b_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+      "check": { "command": "/bin/test -e ${HOME}/task_b_${yyyymmdd}${hhmmss}", "resources": { "cores": 1 } },
+
+      "provides": [ "task_b" ],
+      "requires": [ { "resource": "task_a", "offset": 0 } ],
+
+      "calendar_name": "std",
+      "times": [ "17:00:00" ],
+      "timezone": "America/New_York",
+
+      "valid_from": "2022-01-04T09:00:00",
+      "valid_to": "2023-01-07T00:00:00"
+    }
+  }
+}

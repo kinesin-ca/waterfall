@@ -229,7 +229,7 @@ async fn start_agent_executor(
                         None => {
                             // Give the outstanding tasks a chance to complete or agents
                             // recover
-                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
 
                             // Refresh any disabled targets
                             for (tid, target) in targets.iter_mut().enumerate() {

@@ -82,7 +82,7 @@ impl Schedule {
         )
     }
 
-    pub fn next_time(&self, dt: DateTime<Tz>) -> DateTime<Tz> {
+    pub fn next_time<T: TimeZone>(&self, dt: DateTime<T>) -> DateTime<Tz> {
         let st = dt.with_timezone(&self.timezone);
 
         let mut date = st.date().naive_local();
@@ -108,7 +108,7 @@ impl Schedule {
     }
 
     /// Given a time, generate the preceding interval according to the schedule
-    pub fn prev_time(&self, dt: DateTime<Tz>) -> DateTime<Tz> {
+    pub fn prev_time<T: TimeZone>(&self, dt: DateTime<T>) -> DateTime<Tz> {
         let st = dt.with_timezone(&self.timezone);
 
         let mut date = st.date().naive_local();

@@ -89,6 +89,14 @@ struct Args {
     /// Enable verbose logging
     #[clap(short, long)]
     verbose: bool,
+
+    /// Configuration File
+    #[clap(short, long)]
+    host: Option<String>,
+
+    /// Configuration File
+    #[clap(short, long)]
+    port: Option<u32>,
 }
 
 #[actix_web::main]
@@ -97,6 +105,20 @@ async fn main() -> std::io::Result<()> {
 
     let data = web::Data::new(init(args.config.as_ref()));
     let config = data.clone();
+
+    let host = if let Some(h) = args.host {
+        h
+    } else {
+        config.ip.clone()
+    };
+
+    let port = if let Some(p) = args.port {
+        p
+    } else {
+        config.port
+    };
+
+    let listen_spec = format!("{}:{}", host, port);
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
     let res = HttpServer::new(move || {
@@ -152,7 +174,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/run", web::post().to(submit_task)),
             )
     })
-    .bind(config.listen_spec())?
+    .bind(listen_spec)?
     .run()
     .await;
 

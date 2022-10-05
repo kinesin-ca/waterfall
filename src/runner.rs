@@ -74,9 +74,9 @@ pub struct Runner {
     storage: mpsc::UnboundedSender<StorageMessage>,
 }
 
-fn gen_timeout(timeout: i64) -> tokio::task::JoinHandle<RunnerMessage> {
+fn gen_timeout(duration: Duration) -> tokio::task::JoinHandle<RunnerMessage> {
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::seconds(timeout).to_std().unwrap()).await;
+        tokio::time::sleep(duration.to_std().unwrap()).await;
         RunnerMessage::Timeout
     })
 }
@@ -237,13 +237,16 @@ impl Runner {
         }
 
         let current = if force_check {
+            info!("Force re-check set, starting with empty current state.");
+            ResourceInterval::new()
+        } else {
+            info!("Pulling last state from storage");
             let (response, rx) = oneshot::channel();
             storage
                 .send(StorageMessage::LoadState { response })
                 .unwrap();
-            rx.await.unwrap()
-        } else {
-            ResourceInterval::new()
+            let res = rx.await.unwrap();
+            res
         };
 
         let end_state = tasks.coverage()?;
@@ -317,7 +320,7 @@ impl Runner {
         }
         if result_state != target {
             return Err(anyhow!(
-                "Actions generated produce\n\t{:?}\nExpected\n\t{:?}",
+                "Actions generated produced\n\t{:?}\nExpected\n\t{:?}",
                 result_state,
                 target
             ));
@@ -348,6 +351,17 @@ impl Runner {
                 .iter()
                 .all(|action| action.state == ActionState::Completed)
             {
+                let now = Utc::now();
+                let next_time = self
+                    .tasks
+                    .values()
+                    .map(|t| t.schedule.next_time(now))
+                    .min()
+                    .unwrap()
+                    .with_timezone(&Utc);
+                let sleep_duration = next_time - now;
+                info!("Sleeping for {} until next task", sleep_duration);
+                self.events.push(gen_timeout(sleep_duration));
                 self.tick().unwrap();
             }
             match self.events.next().await {
@@ -371,7 +385,6 @@ impl Runner {
                     task_name,
                     interval,
                 })) => {
-                    println!("Completing {}/{}", task_name, interval);
                     let action = self
                         .queue
                         .iter_mut()
@@ -385,6 +398,7 @@ impl Runner {
                             .or_insert(IntervalSet::new())
                             .insert(action.interval);
                     }
+                    info!("Updating State");
                     self.storage
                         .send(StorageMessage::StoreState {
                             state: self.current.clone(),

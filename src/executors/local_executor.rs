@@ -97,6 +97,8 @@ async fn run_task(
     let (program, args) = cmd.split_first().unwrap();
     attempt.executor.push(format!("{:?}\n", details));
 
+    debug!("Running command {:?}", cmd);
+
     let mut command = Command::new(program);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());

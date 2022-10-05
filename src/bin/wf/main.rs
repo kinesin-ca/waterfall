@@ -1,5 +1,6 @@
 use clap::Parser;
 
+use log::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use waterfall;
@@ -119,6 +120,8 @@ async fn main() -> std::io::Result<()> {
     let (storage_tx, storage_handle) = config.storage.start();
 
     let tasks = world_def.taskset().unwrap();
+
+    debug!("Config: {:?}", args);
 
     let mut runner = Runner::new(
         tasks,

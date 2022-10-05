@@ -22,10 +22,19 @@ impl TaskSet {
     pub fn get_state<T: TimeZone>(&self, time: DateTime<T>) -> Result<ResourceInterval> {
         let mut res = ResourceInterval::new();
 
-        let timeline = IntervalSet::from(Interval::new(MIN_TIME, time.with_timezone(&Utc)));
-
         // Insert all of the covered items
         for task in self.values() {
+            // TODO Need to align each of these intervals with a scheduled time
+            let timeline = if time < MAX_TIME {
+                let cur_intv = task.schedule.interval(time.clone(), 0);
+                if cur_intv.end > time {
+                    IntervalSet::from(Interval::new(MIN_TIME, cur_intv.start))
+                } else {
+                    IntervalSet::from(Interval::new(MIN_TIME, cur_intv.end))
+                }
+            } else {
+                IntervalSet::from(Interval::new(MIN_TIME, time.with_timezone(&Utc)))
+            };
             let task_timeline = task.valid_over.intersection(&timeline);
             for resource in &task.provides {
                 let ris = res.entry(resource.clone()).or_insert(IntervalSet::new());
