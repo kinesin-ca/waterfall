@@ -30,6 +30,24 @@ fn default_bytes() -> usize {
     20480
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum Cmd {
+    Simple(String),
+    Split(Vec<String>),
+}
+
+impl Cmd {
+    pub fn generate(&self, varmap: &VarMap) -> Vec<String> {
+        let cmd = match self {
+            Cmd::Simple(s) => s.split_whitespace().map(|x| x.to_string()).collect(),
+            Cmd::Split(v) => v.clone(),
+        };
+
+        cmd.into_iter().map(|x| varmap.apply_to(&x)).collect()
+    }
+}
+
 /// Options in how to handle task output. Some tasks can be quite
 /// verbose, and the output may not be needed.
 #[derive(Clone, Serialize, Deserialize, Copy, Debug, PartialEq, Hash, Eq)]

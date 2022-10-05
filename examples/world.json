@@ -7,9 +7,9 @@
   },
   "tasks": {
     "task_a": {
-      "up": { "command": "/usr//bin/touch ${HOME}/task_a_${yyyymmdd}" },
-      "down": { "command": "/bin/rm ${HOME}/task_a_${yyyymmdd}" },
-      "check": { "command": "/bin/test -e ${HOME}/task_a_${yyyymmdd}" },
+      "up": { "command": "/usr//bin/touch ${HOME}/task_a_${yyyymmdd}", "resources": { "cores": 1 } },
+      "down": { "command": "/bin/rm ${HOME}/task_a_${yyyymmdd}", "resources": { "cores": 1 } },
+      "check": { "command": "/bin/test -e ${HOME}/task_a_${yyyymmdd}", "resources": { "cores": 1 } },
 
       "provides": [ "task_a" ],
 
@@ -21,9 +21,9 @@
       "valid_to": "2022-01-08T09:00:00"
     },
     "task_b": {
-      "up": { "command": "/usr//bin/touch ${HOME}/task_b_${yyyymmdd}" },
-      "down": { "command": "/bin/rm ${HOME}/task_b_${yyyymmdd}" },
-      "check": { "command": "/bin/test -e ${HOME}/task_b_${yyyymmdd}" },
+      "up": { "command": "/usr//bin/touch ${HOME}/task_b_${yyyymmdd}", "resources": { "cores": 1 } },
+      "down": { "command": "/bin/rm ${HOME}/task_b_${yyyymmdd}", "resources": { "cores": 1 } },
+      "check": { "command": "/bin/test -e ${HOME}/task_b_${yyyymmdd}", "resources": { "cores": 1 } },
 
       "provides": [ "task_b" ],
       "requires": [ { "resource": "task_a", "offset": 0 } ],

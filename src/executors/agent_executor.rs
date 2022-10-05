@@ -69,8 +69,7 @@ impl AgentTarget {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct AgentTaskDetail {
     /// The command and all arguments to run
-    #[serde(default)]
-    command: Vec<String>,
+    command: Cmd,
 
     /// Environment variables to set
     #[serde(default)]
@@ -142,6 +141,7 @@ async fn submit_task(
             }
         }
         Err(e) => {
+            warn!("Failed to submit task: {:?}", e);
             attempt.succeeded = false;
             attempt.infra_failure = true;
             attempt.executor.push(format!(

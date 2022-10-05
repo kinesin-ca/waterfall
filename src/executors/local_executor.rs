@@ -13,24 +13,6 @@ use tokio::io::AsyncReadExt;
 
 type Environment = HashMap<String, Option<String>>;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(untagged)]
-enum Cmd {
-    Simple(String),
-    Split(Vec<String>),
-}
-
-impl Cmd {
-    fn generate(&self, varmap: &VarMap) -> Vec<String> {
-        let cmd = match self {
-            Cmd::Simple(s) => s.split_whitespace().map(|x| x.to_string()).collect(),
-            Cmd::Split(v) => v.clone(),
-        };
-
-        cmd.into_iter().map(|x| varmap.apply_to(&x)).collect()
-    }
-}
-
 /// Contains specifics on how to run a local task
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct LocalTaskDetail {
