@@ -102,6 +102,14 @@ fn validate_task(details: &TaskDetails, max_capacities: &[TaskResources]) -> Res
     }
 }
 
+/// Contains specifics on how to run a local task
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TaskSubmission {
+    details: TaskDetails,
+    varmap: VarMap,
+    output_options: TaskOutputOptions,
+}
+
 async fn submit_task(
     base_url: String,
     details: TaskDetails,
@@ -111,7 +119,12 @@ async fn submit_task(
 ) -> TaskAttempt {
     let submit_url = format!("{}/run", base_url);
     let mut attempt = TaskAttempt::new();
-    match client.post(submit_url).json(&details).send().await {
+    let submission = TaskSubmission {
+        details,
+        varmap,
+        output_options,
+    };
+    match client.post(submit_url).json(&submission).send().await {
         Ok(result) => {
             if result.status() == reqwest::StatusCode::OK {
                 attempt = result.json().await.unwrap();
