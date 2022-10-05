@@ -1,0 +1,8 @@
+- [ ] Implement shutdown when world is complete
+- [ ] Implement endpoints
+  - Get state over interval
+  - Store (interval, {UP,QUEUED,ERRORED, ETC})
+  - Get attempts
+- [ ] Convert Runner to be more like daggyr runner
+- [ ] Implement task kill / stop
+- [ ] Implement force resource down with cascade

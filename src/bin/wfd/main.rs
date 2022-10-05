@@ -2,7 +2,6 @@ use actix_cors::Cors;
 use actix_web::{error, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 
 use tokio::sync::{mpsc, oneshot};
 use waterfall::prelude::*;
