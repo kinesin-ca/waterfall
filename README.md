@@ -12,6 +12,18 @@ scheduling in their design.
 
 ```bash
 cargo build
+
+# wf is a cli for running worlds directly
+
+# A redis instance is required for storage
+
+# Run using the local executor
+cargo run --bin wf -- --config examples/config.json --world examples/world.json
+
+# Starting an agent
+# wfw is a (W)ater(F)low (W)orker
+cargo run --bin wfw
+cargo run --bin wf -- --config examples/config_wfw.json --world examples/world.json
 ```
 
 # Overview
