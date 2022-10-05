@@ -99,23 +99,29 @@ async fn run_task(
     let (response, response_rx) = oneshot::channel();
     executor
         .send(ExecutorMessage::ExecuteTask {
-            task_name,
-            interval,
             details,
             output_options: output_options.clone(),
             varmap: varmap.clone(),
             response,
             kill,
-            storage,
         })
         .unwrap();
-    response_rx.await.unwrap()
+    let attempt = response_rx.await.unwrap();
+    let rc = attempt.succeeded;
+    storage
+        .send(StorageMessage::StoreAttempt {
+            task_name,
+            interval,
+            attempt: attempt.clone(),
+        })
+        .unwrap();
+    rc
 }
 
 async fn up_task(
     task_name: String,
     interval: Interval,
-    kill: oneshot::Receiver<()>,
+    _kill: oneshot::Receiver<()>,
     varmap: VarMap,
     up: TaskDetails,
     check: Option<TaskDetails>,
@@ -124,7 +130,7 @@ async fn up_task(
     storage: mpsc::UnboundedSender<StorageMessage>,
 ) -> RunnerEvent {
     if let Some(check_cmd) = check.clone() {
-        let (subkill, subkill_rx) = oneshot::channel();
+        let (_subkill, subkill_rx) = oneshot::channel();
         let succeeded = run_task(
             task_name.clone(),
             interval,
@@ -147,7 +153,7 @@ async fn up_task(
     }
 
     // UP
-    let (subkill, subkill_rx) = oneshot::channel();
+    let (_subkill, subkill_rx) = oneshot::channel();
     let succeeded = run_task(
         task_name.clone(),
         interval,
@@ -168,7 +174,7 @@ async fn up_task(
 
     // recheck
     if let Some(check_cmd) = check {
-        let (subkill, subkill_rx) = oneshot::channel();
+        let (_subkill, subkill_rx) = oneshot::channel();
         let succeeded = run_task(
             task_name.clone(),
             interval,

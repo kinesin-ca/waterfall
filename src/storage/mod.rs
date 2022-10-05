@@ -25,4 +25,5 @@ pub enum StorageMessage {
     Stop {},
 }
 
-pub mod redis_store;
+pub mod noop;
+pub mod redis;

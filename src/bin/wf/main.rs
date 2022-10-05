@@ -2,6 +2,7 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
+use waterfall;
 use waterfall::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -19,9 +20,10 @@ impl StorageConfig {
     ) {
         let (tx, rx) = mpsc::unbounded_channel();
         match self {
-            StorageConfig::Redis { url, prefix } => {
-                (tx, redis_store::start(rx, url.clone(), prefix.clone()))
-            }
+            StorageConfig::Redis { url, prefix } => (
+                tx,
+                waterfall::storage::redis::start(rx, url.clone(), prefix.clone()),
+            ),
         }
     }
 }

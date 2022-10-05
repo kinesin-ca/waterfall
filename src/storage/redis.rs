@@ -1,5 +1,7 @@
 use super::*;
 
+extern crate redis;
+
 use futures::prelude::*;
 use redis::AsyncCommands;
 

@@ -255,12 +255,9 @@ pub async fn start_local_executor(
                 });
             }
             ExecuteTask {
-                task_name,
-                interval,
                 details,
                 varmap,
                 output_options,
-                storage,
                 response,
                 kill,
             } => {
@@ -277,15 +274,7 @@ pub async fn start_local_executor(
                             ..TaskAttempt::new()
                         },
                     };
-                    let rc = attempt.succeeded;
-                    storage
-                        .send(StorageMessage::StoreAttempt {
-                            task_name,
-                            interval,
-                            attempt,
-                        })
-                        .unwrap();
-                    response.send(rc).unwrap();
+                    response.send(attempt).unwrap();
                 }));
             }
             Stop {} => {

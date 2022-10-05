@@ -183,12 +183,9 @@ async fn start_agent_executor(
                 });
             }
             ExecuteTask {
-                task_name,
-                interval,
                 details,
                 varmap,
                 output_options,
-                storage,
                 response,
                 kill,
             } => {
@@ -214,14 +211,7 @@ async fn start_agent_executor(
                                 )
                                 .await;
                                 let rc = attempt.succeeded;
-                                storage
-                                    .send(StorageMessage::StoreAttempt {
-                                        task_name,
-                                        interval,
-                                        attempt,
-                                    })
-                                    .unwrap();
-                                response.send(rc).unwrap();
+                                response.send(attempt).unwrap();
                                 (tid, resources, rc)
                             }));
                             break;
