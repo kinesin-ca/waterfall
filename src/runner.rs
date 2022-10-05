@@ -251,8 +251,6 @@ impl Runner {
 
         // Create queue
         let required = target.difference(&self.current);
-        println!("CUR: {:?}", self.current);
-        println!("REQ: {:?}", required);
         self.queue = self.tasks.iter().fold(Vec::new(), |mut acc, (name, task)| {
             let res: Vec<Action> = task
                 .generate_intervals(&required)
@@ -315,7 +313,8 @@ impl Runner {
     // We'll be using channels for running
     pub async fn run(&mut self, stop: oneshot::Receiver<RunnerEvent>) {
         self.events.push(tokio::spawn(async move {
-            stop.await.expect("Unable to get stop");
+            // This recv will fail if the channel is shutdown, so just ignore it.
+            stop.await.unwrap_or(RunnerEvent::Stop);
             RunnerEvent::Stop
         }));
         self.queue_actions();

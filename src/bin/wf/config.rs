@@ -60,7 +60,7 @@ pub struct GlobalConfigSpec {
 #[derive(Clone)]
 pub struct GlobalConfig {
     pub pools: HashMap<String, mpsc::UnboundedSender<ExecutorMessage>>,
-    pub tracker: mpsc::UnboundedSender<StorageMessage>,
+    pub storage: mpsc::UnboundedSender<StorageMessage>,
     pub runner: mpsc::UnboundedSender<RunnerMessage>,
     pub default_pool: String,
     pub spec: GlobalConfigSpec,

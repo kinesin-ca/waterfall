@@ -15,11 +15,13 @@ pub enum StorageMessage {
     LoadState {
         response: oneshot::Sender<ResourceInterval>,
     },
+    /*
     GetAttempts {
         task_name: String,
         interval: Interval,
         response: oneshot::Sender<TaskAttempt>,
     },
+    */
     Stop {},
 }
 

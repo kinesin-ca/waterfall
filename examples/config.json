@@ -1,0 +1,12 @@
+{
+  "storage": {
+    "type": "redis",
+    "url": "redis://localhost",
+    "prefix": "world"
+  },
+  "executor": {
+    "type": "local",
+    "workers": 10
+  }
+}
+
