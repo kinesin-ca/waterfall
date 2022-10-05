@@ -3,7 +3,7 @@ use actix_web::{error, middleware::Logger, web, App, HttpResponse, HttpServer, R
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use waterfall::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]

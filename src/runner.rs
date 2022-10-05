@@ -29,7 +29,7 @@ pub struct Action {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum RunnerEvent {
+pub enum RunnerMessage {
     Start,
     TaskFailed {
         task_name: String,
@@ -39,6 +39,16 @@ pub enum RunnerEvent {
         task_name: String,
         interval: Interval,
     },
+    /*
+    ForceUp {
+        resources: HashSet<String>,
+        interval: Interval,
+    },
+    ForceDown {
+        resources: HashSet<String>,
+        interval: Interval,
+    },
+    */
     Timeout,
     Stop,
 }
@@ -57,17 +67,17 @@ pub struct Runner {
     queue: Vec<Action>,
     qidx: usize,
 
-    events: FuturesUnordered<tokio::task::JoinHandle<RunnerEvent>>,
+    events: FuturesUnordered<tokio::task::JoinHandle<RunnerMessage>>,
 
     last_horizon: DateTime<Utc>,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
     storage: mpsc::UnboundedSender<StorageMessage>,
 }
 
-fn gen_timeout(timeout: i64) -> tokio::task::JoinHandle<RunnerEvent> {
+fn gen_timeout(timeout: i64) -> tokio::task::JoinHandle<RunnerMessage> {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::seconds(timeout).to_std().unwrap()).await;
-        RunnerEvent::Timeout
+        RunnerMessage::Timeout
     })
 }
 
@@ -95,7 +105,7 @@ async fn run_task(
     output_options: &TaskOutputOptions,
     varmap: &VarMap,
 ) -> bool {
-    println!("Running {}/{}", task_name, interval);
+    info!("Running {}/{}", task_name, interval);
     let (response, response_rx) = oneshot::channel();
     executor
         .send(ExecutorMessage::ExecuteTask {
@@ -128,7 +138,7 @@ async fn up_task(
     output_options: TaskOutputOptions,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
     storage: mpsc::UnboundedSender<StorageMessage>,
-) -> RunnerEvent {
+) -> RunnerMessage {
     if let Some(check_cmd) = check.clone() {
         let (_subkill, subkill_rx) = oneshot::channel();
         let succeeded = run_task(
@@ -145,7 +155,7 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            return RunnerEvent::TaskCompleted {
+            return RunnerMessage::TaskCompleted {
                 task_name,
                 interval,
             };
@@ -166,7 +176,7 @@ async fn up_task(
     )
     .await;
     if !succeeded {
-        return RunnerEvent::TaskFailed {
+        return RunnerMessage::TaskFailed {
             task_name,
             interval,
         };
@@ -189,18 +199,18 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            RunnerEvent::TaskCompleted {
+            RunnerMessage::TaskCompleted {
                 task_name,
                 interval,
             }
         } else {
-            RunnerEvent::TaskFailed {
+            RunnerMessage::TaskFailed {
                 task_name,
                 interval,
             }
         }
     } else {
-        RunnerEvent::TaskCompleted {
+        RunnerMessage::TaskCompleted {
             task_name,
             interval,
         }
@@ -322,34 +332,42 @@ impl Runner {
     }
 
     // We'll be using channels for running
-    pub async fn run(&mut self, stop: oneshot::Receiver<RunnerEvent>) {
+    pub async fn run(&mut self, stop: oneshot::Receiver<RunnerMessage>) {
         self.events.push(tokio::spawn(async move {
             // This recv will fail if the channel is shutdown, so just ignore it.
-            stop.await.unwrap_or(RunnerEvent::Stop);
-            RunnerEvent::Stop
+            stop.await.unwrap_or(RunnerMessage::Stop);
+            RunnerMessage::Stop
         }));
         self.queue_actions();
 
         // Loop while we can make progress
         while !self.is_done() {
+            // Queue up tasks
+            if self
+                .queue
+                .iter()
+                .all(|action| action.state == ActionState::Completed)
+            {
+                self.tick().unwrap();
+            }
             match self.events.next().await {
-                Some(Ok(RunnerEvent::Start)) => {
+                Some(Ok(RunnerMessage::Start)) => {
                     self.queue_actions();
                 }
-                Some(Ok(RunnerEvent::Stop)) => {
+                Some(Ok(RunnerMessage::Stop)) => {
                     break;
                 }
-                Some(Ok(RunnerEvent::Timeout)) => {
+                Some(Ok(RunnerMessage::Timeout)) => {
                     self.queue_actions();
                 }
-                Some(Ok(RunnerEvent::TaskFailed {
+                Some(Ok(RunnerMessage::TaskFailed {
                     task_name,
                     interval,
                 })) => {
                     println!("FAILED: {} / {}", task_name, interval);
                     println!("Well that sucks");
                 }
-                Some(Ok(RunnerEvent::TaskCompleted {
+                Some(Ok(RunnerMessage::TaskCompleted {
                     task_name,
                     interval,
                 })) => {

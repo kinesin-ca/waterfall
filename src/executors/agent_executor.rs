@@ -117,7 +117,6 @@ async fn submit_task(
     varmap: VarMap,
 ) -> Result<TaskAttempt> {
     let submit_url = format!("{}/run", base_url);
-    let mut attempt = TaskAttempt::new();
     let submission = TaskSubmission {
         details,
         varmap,
@@ -126,7 +125,7 @@ async fn submit_task(
     match client.post(submit_url).json(&submission).send().await {
         Ok(result) => {
             if result.status() == reqwest::StatusCode::OK {
-                attempt = result.json().await.unwrap();
+                let mut attempt: TaskAttempt = result.json().await.unwrap();
                 attempt
                     .executor
                     .push(format!("Executed on agent at {}", base_url));

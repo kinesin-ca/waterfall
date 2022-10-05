@@ -4,13 +4,11 @@ use actix_cors::Cors;
 use actix_web::{error, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
 use clap::Parser;
 use serde::Serialize;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
 use config::*;
 use waterfall::executors::agent_executor::TaskSubmission;
 use waterfall::prelude::*;
-
-type TaskDetails = serde_json::Value;
 
 #[derive(Serialize)]
 struct SimpleError {
