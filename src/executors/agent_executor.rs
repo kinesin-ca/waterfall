@@ -115,7 +115,7 @@ async fn submit_task(
     output_options: TaskOutputOptions,
     client: reqwest::Client,
     varmap: VarMap,
-) -> TaskAttempt {
+) -> Result<TaskAttempt> {
     let submit_url = format!("{}/run", base_url);
     let mut attempt = TaskAttempt::new();
     let submission = TaskSubmission {
@@ -130,28 +130,21 @@ async fn submit_task(
                 attempt
                     .executor
                     .push(format!("Executed on agent at {}", base_url));
+                Ok(attempt)
             } else {
-                attempt.succeeded = false;
-                attempt.infra_failure = true;
-                attempt.executor.push(format!(
+                Err(anyhow!(
                     "Unable to dispatch to agent at {}: {:?}",
                     base_url,
                     result.text().await.unwrap()
-                ));
+                ))
             }
         }
-        Err(e) => {
-            warn!("Failed to submit task: {:?}", e);
-            attempt.succeeded = false;
-            attempt.infra_failure = true;
-            attempt.executor.push(format!(
-                "Unable to dispatch to agent at {}: {:?}",
-                base_url, e
-            ));
-        }
+        Err(e) => Err(anyhow!(
+            "Unable to dispatch to agent at {}: {:?}",
+            base_url,
+            e
+        )),
     }
-
-    attempt
 }
 
 // async fn select_target() -> Option<usize> {}
@@ -211,11 +204,12 @@ async fn start_agent_executor(
                     }) {
                         // There is a remote agent with capacity
                         Some((tid, target)) => {
+                            info!("Dispatching job to {}", target.base_url);
                             target.current_resources.sub(&resources).unwrap();
                             let base_url = target.base_url.clone();
                             let submit_client = client.clone();
                             running.push(tokio::spawn(async move {
-                                let attempt = submit_task(
+                                let res = submit_task(
                                     base_url,
                                     details,
                                     output_options,
@@ -223,8 +217,11 @@ async fn start_agent_executor(
                                     varmap,
                                 )
                                 .await;
-                                let rc = attempt.succeeded;
-                                response.send(attempt).unwrap();
+                                let mut rc = false;
+                                if let Ok(attempt) = res {
+                                    response.send(attempt).unwrap();
+                                    rc = true;
+                                }
                                 (tid, resources, rc)
                             }));
                             break;
@@ -233,13 +230,11 @@ async fn start_agent_executor(
                         None => {
                             // Give the outstanding tasks a chance to complete or agents
                             // recover
-                            tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-                            info!("Waiting to run message");
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
                             // Refresh any disabled targets
                             for (tid, target) in targets.iter_mut().enumerate() {
                                 if target.enabled {
-                                    info!("Skipping {} as it is enabled", target.base_url);
                                     continue;
                                 }
                                 target.refresh_resources(&client).await;

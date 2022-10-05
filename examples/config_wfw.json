@@ -1,0 +1,17 @@
+{
+  "storage": {
+    "type": "redis",
+    "url": "redis://localhost",
+    "prefix": "world"
+  },
+  "executor": {
+    "type": "agent",
+    "targets": [
+      {
+        "base_url": "http://localhost:2504/api/v1",
+        "resources": { "cores": 10 }
+      }
+    ]
+  }
+}
+
