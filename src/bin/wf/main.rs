@@ -29,7 +29,12 @@ impl StorageConfig {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case", deny_unknown_fields, tag = "type")]
 enum ExecutorConfig {
-    Local { workers: usize },
+    Local {
+        workers: usize,
+    },
+    Agent {
+        targets: Vec<agent_executor::AgentTarget>,
+    },
 }
 
 impl ExecutorConfig {
@@ -42,6 +47,7 @@ impl ExecutorConfig {
         let (tx, rx) = mpsc::unbounded_channel();
         match self {
             ExecutorConfig::Local { workers } => (tx, local_executor::start(*workers, rx)),
+            ExecutorConfig::Agent { targets } => (tx, agent_executor::start(targets.clone(), rx)),
         }
     }
 }

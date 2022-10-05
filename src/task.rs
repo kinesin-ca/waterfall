@@ -1,4 +1,63 @@
 use super::*;
+use std::ops::{Deref, DerefMut};
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct TaskResources(HashMap<String, i64>);
+
+impl Deref for TaskResources {
+    type Target = HashMap<String, i64>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for TaskResources {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl TaskResources {
+    #[must_use]
+    pub fn new() -> Self {
+        TaskResources(HashMap::new())
+    }
+
+    #[must_use]
+    pub fn can_satisfy(&self, requirements: &TaskResources) -> bool {
+        requirements
+            .iter()
+            .all(|(k, v)| self.contains_key(k) && self[k] >= *v)
+    }
+
+    /// Subtracts resources from available resources.
+    /// # Errors
+    /// Returns an `Err` if the requested resources cannot be fulfilled
+    /// # Panics
+    /// It doesn't, keys are checked for ahead-of-time
+    pub fn sub(&mut self, resources: &TaskResources) -> Result<()> {
+        if self.can_satisfy(resources) {
+            for (k, v) in resources.iter() {
+                *self.get_mut(k).unwrap() -= v;
+            }
+            Ok(())
+        } else {
+            Err(anyhow!("Cannot satisfy requested resources"))
+        }
+    }
+
+    /// # Panics
+    /// It doesn't, keys are checked for ahead-of-time
+    pub fn add(&mut self, resources: &TaskResources) {
+        for (k, v) in resources.iter() {
+            if self.contains_key(k) {
+                *self.get_mut(k).unwrap() += *v;
+            } else {
+                self.insert(k.clone(), *v);
+            }
+        }
+    }
+}
 
 /// Defines the struct to parse for tasks
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]

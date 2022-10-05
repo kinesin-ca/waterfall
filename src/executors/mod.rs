@@ -1,4 +1,5 @@
 use super::*;
+pub mod agent_executor;
 pub mod local_executor;
 
 /// Messages for interacting with an Executor
