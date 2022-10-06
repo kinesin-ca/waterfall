@@ -1,7 +1,7 @@
 - core
   - [ ] Convert Runner to be more like daggyr runner
   - [ ] Implement task kill / stop
-  - [ ] Implement force resource down with cascade
+  - [ ] Implement force resources up/down with cascade
 - wfd
   - [ ] Implement shutdown when world is complete
   - [ ] Implement endpoints
