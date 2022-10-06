@@ -32,18 +32,26 @@ pub struct Action {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RunnerMessage {
     Tick,
-    ActionCompleted { action_id: usize, succeeded: bool },
-    RetryAction { action_id: usize },
+    ActionCompleted {
+        action_id: usize,
+        succeeded: bool,
+    },
+    RetryAction {
+        action_id: usize,
+    },
     /*
+    /// Marks all resources in the set available over the interval
     ForceUp {
         resources: HashSet<String>,
         interval: Interval,
     },
+    */
+    /// Marks all resources in the set as down over _at least_ the interval.
+    /// Will cause a re-check / re-gen
     ForceDown {
         resources: HashSet<String>,
         interval: Interval,
     },
-    */
     Stop,
 }
 
@@ -334,6 +342,37 @@ impl Runner {
                     self.events
                         .push(delayed_event(Duration::seconds(5), RunnerMessage::Tick));
                 }
+                /*
+                Some(Ok(RunnerMessage::ForceUp {
+                    resources,
+                    interval,
+                })) => {
+                }
+                */
+                Some(Ok(RunnerMessage::ForceDown {
+                    resources,
+                    interval,
+                })) => {
+                    // Use the interval to identify
+                    for (tid, task) in self.tasks.iter().enumerate() {
+                        if task.provides.is_subset(&resources) {
+                            let aligned_is =
+                                IntervalSet::from(task.schedule.align_interval(interval));
+                            for resource in &task.provides {
+                                self.current
+                                    .get_mut(resource)
+                                    .unwrap()
+                                    .subtract(&aligned_is);
+                            }
+                            for action in &mut self.actions {
+                                if action.task == tid && aligned_is.has_subset(action.interval) {
+                                    action.state = ActionState::Queued;
+                                }
+                            }
+                        }
+                    }
+                    self.store_state();
+                }
                 Some(Ok(RunnerMessage::Stop)) => {
                     info!("Stopping");
                     break;
@@ -347,29 +386,7 @@ impl Runner {
                     action_id,
                     succeeded,
                 })) => {
-                    info!("Completing action {}", action_id);
-                    if succeeded {
-                        let action = &mut self.actions[action_id];
-                        let task = self.tasks.get(action.task).unwrap();
-                        action.state = ActionState::Completed;
-                        for res in &task.provides {
-                            self.current
-                                .entry(res.clone())
-                                .or_insert(IntervalSet::new())
-                                .insert(action.interval);
-                        }
-                        self.storage
-                            .send(StorageMessage::StoreState {
-                                state: self.current.clone(),
-                            })
-                            .unwrap();
-                        self.queue_actions();
-                    } else {
-                        self.events.push(delayed_event(
-                            Duration::seconds(30),
-                            RunnerMessage::RetryAction { action_id },
-                        ));
-                    }
+                    self.complete_task(action_id, succeeded);
                 }
                 Some(Err(e)) => {
                     panic!("Something went wrong: {:?}", e)
@@ -378,6 +395,36 @@ impl Runner {
             }
             // Log stuff
         }
+    }
+
+    fn complete_task(&mut self, action_id: usize, succeeded: bool) {
+        info!("Completing action {}", action_id);
+        if succeeded {
+            let action = &mut self.actions[action_id];
+            let task = self.tasks.get(action.task).unwrap();
+            action.state = ActionState::Completed;
+            for res in &task.provides {
+                self.current
+                    .entry(res.clone())
+                    .or_insert(IntervalSet::new())
+                    .insert(action.interval);
+            }
+            self.store_state();
+            self.queue_actions();
+        } else {
+            self.events.push(delayed_event(
+                Duration::seconds(30),
+                RunnerMessage::RetryAction { action_id },
+            ));
+        }
+    }
+
+    fn store_state(&self) {
+        self.storage
+            .send(StorageMessage::StoreState {
+                state: self.current.clone(),
+            })
+            .unwrap();
     }
 
     fn queue_actions(&mut self) {

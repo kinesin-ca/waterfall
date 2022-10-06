@@ -21,6 +21,32 @@ impl Schedule {
         }
     }
 
+    fn is_end_time<T: TimeZone>(&self, dt: DateTime<T>) -> bool {
+        // Need to get the current interval, then offset it
+        let at = dt.with_timezone(&self.timezone);
+        self.times.iter().any(|x| *x == at.time())
+            && self.calendar.includes(at.date().naive_local())
+    }
+
+    /// Given an interval I, return the interval J that is the smallest
+    /// set of schedule intervals that completely contain I.
+    /// If the given interval is bounded by MIN_TIME or MAX_TIME, then the
+    /// returned interval will be likewise bounded
+    pub fn align_interval(&self, interval: Interval) -> Interval {
+        let st = if interval.start == MIN_TIME {
+            self.next_time(interval.start).with_timezone(&Utc)
+        } else {
+            interval.start
+        };
+        let et = if interval.end == MAX_TIME {
+            self.prev_time(interval.end).with_timezone(&Utc)
+        } else {
+            interval.end
+        };
+
+        Interval::new(self.interval(st, 0).start, self.interval(et, 0).end)
+    }
+
     pub fn generate(&self, interval: Interval) -> Vec<Interval> {
         if self.times.is_empty() {
             return Vec::new();
@@ -67,9 +93,7 @@ impl Schedule {
         let at = dt.with_timezone(&self.timezone);
 
         // If the time is at an edge
-        let rt = if self.times.iter().any(|x| *x == at.time())
-            && self.calendar.includes(at.date().naive_local())
-        {
+        let rt = if self.is_end_time(at) {
             at
         } else {
             self.next_time(at)

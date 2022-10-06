@@ -126,6 +126,12 @@ impl IntervalSet {
     pub fn difference(&self, other: &Self) -> Self {
         self.intersection(&other.complement())
     }
+
+    /// Subtract all intervals in `other` from self
+    /// both sides must be sorted
+    pub fn subtract(&mut self, other: &Self) {
+        self.0 = self.difference(other).0;
+    }
 }
 impl Deref for IntervalSet {
     type Target = Vec<Interval>;
