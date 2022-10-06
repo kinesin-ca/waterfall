@@ -93,8 +93,25 @@ async fn get_state(state: web::Data<AppState>) -> impl Responder {
     let (response, rx) = oneshot::channel();
 
     state
-        .storage_tx
-        .send(StorageMessage::LoadState { response })
+        .runner_tx
+        .send(RunnerMessage::GetState { response })
+        .unwrap();
+
+    match rx.await {
+        Ok(world) => HttpResponse::Ok().json(world),
+        Err(error) => HttpResponse::BadRequest().json(SimpleError {
+            error: format!("{:?}", error),
+        }),
+    }
+}
+
+async fn timeline(span: web::Query<Interval>, state: web::Data<AppState>) -> impl Responder {
+    let interval = span.into_inner();
+
+    let (response, rx) = oneshot::channel();
+    state
+        .runner_tx
+        .send(RunnerMessage::GetResourceStateDetails { interval, response })
         .unwrap();
 
     match rx.await {
@@ -191,7 +208,7 @@ async fn main() -> std::io::Result<()> {
     .unwrap();
 
     let runner_handle = tokio::spawn(async move {
-        runner.run().await;
+        runner.run(true).await;
     });
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));

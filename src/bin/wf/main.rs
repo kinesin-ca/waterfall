@@ -136,7 +136,7 @@ async fn main() -> std::io::Result<()> {
     .await
     .unwrap();
 
-    runner.run().await;
+    runner.run(false).await;
 
     exe_tx.send(ExecutorMessage::Stop {}).unwrap();
     exe_handle.await.unwrap();
