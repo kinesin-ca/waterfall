@@ -26,15 +26,10 @@ impl WorldDefinition {
                 ));
             }
         }
-        let tasks: HashMap<String, Task> = self
+        let tasks: Vec<Task> = self
             .tasks
             .iter()
-            .map(|(tn, td)| {
-                (
-                    tn.clone(),
-                    td.to_task(tn, self.calendars.get(&td.calendar_name).unwrap()),
-                )
-            })
+            .map(|(tn, td)| td.to_task(tn, self.calendars.get(&td.calendar_name).unwrap()))
             .collect();
         let ts = TaskSet::from(tasks);
 

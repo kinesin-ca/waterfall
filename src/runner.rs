@@ -1,6 +1,7 @@
 use super::*;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::StreamExt;
+use std::collections::VecDeque;
 
 /*
     Runner is responsible for taking a TaskSet and a varmap and
@@ -22,7 +23,7 @@ pub enum ActionState {
 
 #[derive(Debug, Clone)]
 pub struct Action {
-    task: String,
+    task: usize,
     interval: Interval,
     state: ActionState,
     // kill: Option<oneshot::Receiver<()>>,
@@ -30,15 +31,9 @@ pub struct Action {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RunnerMessage {
-    Start,
-    TaskFailed {
-        task_name: String,
-        interval: Interval,
-    },
-    TaskCompleted {
-        task_name: String,
-        interval: Interval,
-    },
+    Tick,
+    ActionCompleted { action_id: usize, succeeded: bool },
+    RetryAction { action_id: usize },
     /*
     ForceUp {
         resources: HashSet<String>,
@@ -49,7 +44,6 @@ pub enum RunnerMessage {
         interval: Interval,
     },
     */
-    Timeout,
     Stop,
 }
 
@@ -64,21 +58,15 @@ pub struct Runner {
     target: ResourceInterval,
     current: ResourceInterval,
 
-    queue: Vec<Action>,
+    actions: Vec<Action>,
     qidx: usize,
 
     events: FuturesUnordered<tokio::task::JoinHandle<RunnerMessage>>,
 
     last_horizon: DateTime<Utc>,
+    messages: mpsc::UnboundedReceiver<RunnerMessage>,
     executor: mpsc::UnboundedSender<ExecutorMessage>,
     storage: mpsc::UnboundedSender<StorageMessage>,
-}
-
-fn gen_timeout(duration: Duration) -> tokio::task::JoinHandle<RunnerMessage> {
-    tokio::spawn(async move {
-        tokio::time::sleep(duration.to_std().unwrap()).await;
-        RunnerMessage::Timeout
-    })
 }
 
 async fn validate_cmd(
@@ -129,6 +117,7 @@ async fn run_task(
 }
 
 async fn up_task(
+    action_id: usize,
     task_name: String,
     interval: Interval,
     _kill: oneshot::Receiver<()>,
@@ -155,9 +144,9 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            return RunnerMessage::TaskCompleted {
-                task_name,
-                interval,
+            return RunnerMessage::ActionCompleted {
+                action_id,
+                succeeded: true,
             };
         }
     }
@@ -176,9 +165,9 @@ async fn up_task(
     )
     .await;
     if !succeeded {
-        return RunnerMessage::TaskFailed {
-            task_name,
-            interval,
+        return RunnerMessage::ActionCompleted {
+            action_id,
+            succeeded: false,
         };
     }
 
@@ -199,34 +188,45 @@ async fn up_task(
 
         // If check succeeded, resources are up
         if succeeded {
-            RunnerMessage::TaskCompleted {
-                task_name,
-                interval,
-            }
+            return RunnerMessage::ActionCompleted {
+                action_id,
+                succeeded: true,
+            };
         } else {
-            RunnerMessage::TaskFailed {
-                task_name,
-                interval,
-            }
+            return RunnerMessage::ActionCompleted {
+                action_id,
+                succeeded: false,
+            };
         }
     } else {
-        RunnerMessage::TaskCompleted {
-            task_name,
-            interval,
-        }
+        return RunnerMessage::ActionCompleted {
+            action_id,
+            succeeded: true,
+        };
     }
+}
+
+fn delayed_event(delay: Duration, event: RunnerMessage) -> tokio::task::JoinHandle<RunnerMessage> {
+    tokio::spawn(async move {
+        tokio::time::sleep(delay.to_std().unwrap()).await;
+        event
+    })
 }
 
 impl Runner {
     pub async fn new(
         tasks: TaskSet,
         vars: VarMap,
+        messages: mpsc::UnboundedReceiver<RunnerMessage>,
         executor: mpsc::UnboundedSender<ExecutorMessage>,
         storage: mpsc::UnboundedSender<StorageMessage>,
         output_options: TaskOutputOptions,
         force_check: bool,
     ) -> Result<Self> {
-        for tdef in tasks.values() {
+        tasks.validate()?;
+
+        // Validate the task commands can run on the executor
+        for tdef in tasks.iter() {
             validate_cmd(executor.clone(), tdef.up.clone()).await?;
             if let Some(cmd) = &tdef.down {
                 validate_cmd(executor.clone(), cmd.clone()).await?;
@@ -236,6 +236,7 @@ impl Runner {
             }
         }
 
+        // Load last-known state
         let current = if force_check {
             info!("Force re-check set, starting with empty current state.");
             ResourceInterval::new()
@@ -248,172 +249,132 @@ impl Runner {
             let res = rx.await.unwrap();
             res
         };
+        let target = current.clone();
 
-        let end_state = tasks.coverage()?;
+        let end_state = tasks.coverage();
         let mut runner = Runner {
             tasks,
             vars,
             output_options,
             end_state,
-            target: ResourceInterval::new(),
+            target,
             current,
-            queue: Vec::new(),
+            actions: Vec::new(),
             qidx: 0,
             events: FuturesUnordered::new(),
             last_horizon: DateTime::<Utc>::MIN_UTC,
+            messages,
             executor,
             storage,
         };
 
-        runner.tick()?;
+        runner.tick();
+        runner.queue_actions();
 
         Ok(runner)
     }
 
-    pub fn tick(&mut self) -> Result<()> {
-        let target = self.tasks.get_state(Utc::now())?;
+    // Generate a new target state and generate any required actions
+    pub fn tick(&mut self) {
+        let new_target = self.tasks.get_state(Utc::now() + Duration::days(1));
+        let new_required = new_target.difference(&self.target);
+        let mut new_actions =
+            self.tasks
+                .iter()
+                .enumerate()
+                .fold(Vec::new(), |mut acc, (idx, task)| {
+                    let res: Vec<Action> = task
+                        .generate_intervals(&new_required)
+                        .unwrap()
+                        .into_iter()
+                        .map({
+                            |interval| Action {
+                                task: idx,
+                                interval,
+                                state: ActionState::Queued,
+                            }
+                        })
+                        .collect();
+                    acc.extend(res);
+                    acc
+                });
+        new_actions.sort_unstable_by(|a, b| a.interval.end.partial_cmp(&b.interval.end).unwrap());
 
-        // Create queue
-        let required = target.difference(&self.current);
-        self.queue = self.tasks.iter().fold(Vec::new(), |mut acc, (name, task)| {
-            let res: Vec<Action> = task
-                .generate_intervals(&required)
-                .unwrap()
-                .into_iter()
-                .map({
-                    |interval| Action {
-                        task: name.clone(),
-                        interval,
-                        state: ActionState::Queued,
-                    }
-                })
-                .collect();
-            acc.extend(res);
-            acc
-        });
-
-        // Ensure that all actions can be satisfied
-        let unsatisfied = self
-            .queue
-            .iter()
-            .filter(|act| {
-                !self
-                    .tasks
-                    .get(&act.task)
-                    .unwrap()
-                    .can_be_satisfied(act.interval, &target)
-            })
-            .fold(HashSet::new(), |mut acc, a| {
-                acc.insert(a.task.clone());
-                acc
-            });
-
-        // Ensure current +
-        let mut result_state = self.current.clone();
-        for action in &self.queue {
-            for res in &self.tasks.get(&action.task).unwrap().provides {
-                result_state
-                    .entry(res.clone())
-                    .or_insert(IntervalSet::new())
-                    .insert(action.interval);
-            }
-        }
-        if result_state != target {
-            return Err(anyhow!(
-                "Actions generated produced\n\t{:?}\nExpected\n\t{:?}",
-                result_state,
-                target
-            ));
-        }
-
-        if unsatisfied.is_empty() {
-            self.target = target;
-            Ok(())
-        } else {
-            Err(anyhow!("Tasks {:?} cannot complete as the target state does not provide required resources", unsatisfied))
-        }
+        info!("Tick: Generated {} new actions", new_actions.len());
+        self.actions.extend(new_actions);
     }
 
-    // We'll be using channels for running
-    pub async fn run(&mut self, stop: oneshot::Receiver<RunnerMessage>) {
-        self.events.push(tokio::spawn(async move {
-            // This recv will fail if the channel is shutdown, so just ignore it.
-            stop.await.unwrap_or(RunnerMessage::Stop);
-            RunnerMessage::Stop
-        }));
-        self.queue_actions();
+    pub async fn run(&mut self) {
+        self.events
+            .push(delayed_event(Duration::seconds(1), RunnerMessage::Tick));
 
-        // Loop while we can make progress
+        // Need to incorporate the ability to receive messages
+        //
+        // Loop until the current state matches the end state
         while !self.is_done() {
-            // Queue up tasks
-            if self
-                .queue
-                .iter()
-                .all(|action| action.state == ActionState::Completed)
-            {
-                let now = Utc::now();
-                let next_time = self
-                    .tasks
-                    .values()
-                    .map(|t| t.schedule.next_time(now))
-                    .min()
-                    .unwrap()
-                    .with_timezone(&Utc);
-                let sleep_duration = next_time - now;
-                info!("Sleeping for {} until next task", sleep_duration);
-                self.events.push(gen_timeout(sleep_duration));
-                self.tick().unwrap();
-            }
             match self.events.next().await {
-                Some(Ok(RunnerMessage::Start)) => {
+                Some(Ok(RunnerMessage::Tick)) => {
+                    debug!("Tick");
+                    // Enqueue new messages
+                    while let Ok(msg) = self.messages.try_recv() {
+                        self.events.push(delayed_event(Duration::seconds(0), msg));
+                    }
+                    match self.actions.last() {
+                        Some(action) => {
+                            if action.interval.end <= Utc::now() {
+                                self.tick()
+                            }
+                        }
+                        None => self.tick(),
+                    }
+
+                    // Perform maintenance
                     self.queue_actions();
+
+                    self.events
+                        .push(delayed_event(Duration::seconds(5), RunnerMessage::Tick));
                 }
                 Some(Ok(RunnerMessage::Stop)) => {
+                    info!("Stopping");
                     break;
                 }
-                Some(Ok(RunnerMessage::Timeout)) => {
-                    self.queue_actions();
+                Some(Ok(RunnerMessage::RetryAction { action_id })) => {
+                    info!("Retrying action {}", action_id);
+                    let action = &mut self.actions[action_id];
+                    action.state = ActionState::Queued;
                 }
-                Some(Ok(RunnerMessage::TaskFailed {
-                    task_name,
-                    interval,
+                Some(Ok(RunnerMessage::ActionCompleted {
+                    action_id,
+                    succeeded,
                 })) => {
-                    println!("FAILED: {} / {}", task_name, interval);
-                    println!("Well that sucks");
-                }
-                Some(Ok(RunnerMessage::TaskCompleted {
-                    task_name,
-                    interval,
-                })) => {
-                    let action = self
-                        .queue
-                        .iter_mut()
-                        .find(|x| x.task == task_name && x.interval == interval)
-                        .unwrap();
-                    let task = self.tasks.get(&task_name).unwrap();
-                    action.state = ActionState::Completed;
-                    for res in &task.provides {
-                        self.current
-                            .entry(res.clone())
-                            .or_insert(IntervalSet::new())
-                            .insert(action.interval);
+                    info!("Completing action {}", action_id);
+                    if succeeded {
+                        let action = &mut self.actions[action_id];
+                        let task = self.tasks.get(action.task).unwrap();
+                        action.state = ActionState::Completed;
+                        for res in &task.provides {
+                            self.current
+                                .entry(res.clone())
+                                .or_insert(IntervalSet::new())
+                                .insert(action.interval);
+                        }
+                        self.storage
+                            .send(StorageMessage::StoreState {
+                                state: self.current.clone(),
+                            })
+                            .unwrap();
+                        self.queue_actions();
+                    } else {
+                        self.events.push(delayed_event(
+                            Duration::seconds(30),
+                            RunnerMessage::RetryAction { action_id },
+                        ));
                     }
-                    info!("Updating State");
-                    self.storage
-                        .send(StorageMessage::StoreState {
-                            state: self.current.clone(),
-                        })
-                        .unwrap();
-                    self.queue_actions();
                 }
                 Some(Err(e)) => {
                     panic!("Something went wrong: {:?}", e)
                 }
-                None => {
-                    // No pending actions waiting
-                    // Can probably wait to the next event
-                    continue;
-                }
+                None => {}
             }
             // Log stuff
         }
@@ -422,12 +383,14 @@ impl Runner {
     fn queue_actions(&mut self) {
         let now = Utc::now();
 
-        // Collect any outstanding futures
-        for action in self.queue[self.qidx..]
+        // Submit any elligible jobs
+        for (action_id, action) in self
+            .actions
             .iter_mut()
-            .filter(|x| x.state == ActionState::Queued && x.interval.end <= now)
+            .enumerate()
+            .filter(|(_, x)| x.state == ActionState::Queued && x.interval.end <= now)
         {
-            let task = self.tasks.get(&action.task).unwrap();
+            let task = self.tasks.get(action.task).unwrap();
             if !task.can_run(action.interval, &self.current) {
                 continue;
             }
@@ -436,7 +399,7 @@ impl Runner {
                 .iter()
                 .chain(self.vars.iter())
                 .collect();
-            let task_name = action.task.clone();
+            let task_name = task.name.clone();
             let interval = action.interval;
             let up = task.up.clone();
             let check = task.check.clone();
@@ -445,6 +408,7 @@ impl Runner {
             let storage = self.storage.clone();
             self.events.push(tokio::spawn(async move {
                 up_task(
+                    action_id,
                     task_name.clone(),
                     interval,
                     kill,
@@ -532,9 +496,11 @@ mod tests {
             "world_test".to_owned(),
         );
 
+        let (runner_tx, runner_rx) = mpsc::unbounded_channel();
         let mut runner = Runner::new(
             tasks,
             world_def.variables,
+            runner_rx,
             tx.clone(),
             storage_tx.clone(),
             world_def.output_options,
@@ -543,8 +509,7 @@ mod tests {
         .await
         .unwrap();
 
-        let (wtx, wrx) = oneshot::channel();
-        runner.run(wrx).await;
+        runner.run().await;
 
         tx.send(ExecutorMessage::Stop {}).unwrap();
         executor.await.unwrap();

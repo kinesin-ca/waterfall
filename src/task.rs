@@ -126,6 +126,7 @@ impl TaskDefinition {
         let actual_end = schedule.interval(end, 0).start;
 
         Task {
+            name: name.to_owned(),
             up: self.up.clone(),
             down: self.down.clone(),
             check: self.check.clone(),
@@ -147,6 +148,7 @@ impl TaskDefinition {
 */
 #[derive(Clone, Serialize, Debug)]
 pub struct Task {
+    pub name: String,
     pub up: TaskDetails,
     pub down: Option<TaskDetails>,
     pub check: Option<TaskDetails>,
@@ -238,6 +240,13 @@ impl Task {
             .all(|req| req.can_be_satisfied(interval, &self.schedule, available))
     }
 
+    pub fn requires_resources(&self) -> HashSet<Resource> {
+        self.requires.iter().fold(HashSet::new(), |mut acc, req| {
+            acc.extend(req.resources());
+            acc
+        })
+    }
+
     pub fn up(&self, interval: &Interval) -> Result<HashSet<String>> {
         if self.check(interval) {
             Ok(self.provides.clone())
@@ -315,7 +324,7 @@ mod tests {
         // Produces a std
         let cal = Calendar::new();
 
-        let task = task_def.to_task(&cal);
+        let task = task_def.to_task("test", &cal);
 
         // Assert the valid interval is correct
         assert_eq!(

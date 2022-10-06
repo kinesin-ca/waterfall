@@ -43,9 +43,3 @@ pub mod task;
 pub mod task_set;
 pub mod varmap;
 pub mod world;
-
-/*
-    TODO:
-        target_state -> TaskSet.coverage()
-        current state
-*/

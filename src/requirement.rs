@@ -18,6 +18,8 @@ pub trait Satisfiable {
         schedule: &Schedule,
         available: &HashMap<String, IntervalSet>,
     ) -> bool;
+
+    fn resources(&self) -> HashSet<Resource>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -29,6 +31,23 @@ pub enum AggregateRequirement {
 }
 
 impl Satisfiable for AggregateRequirement {
+    fn resources(&self) -> HashSet<Resource> {
+        match self {
+            AggregateRequirement::All(reqs) => reqs.iter().fold(HashSet::new(), |mut acc, req| {
+                acc.extend(req.resources());
+                acc
+            }),
+            AggregateRequirement::Any(reqs) => reqs.iter().fold(HashSet::new(), |mut acc, req| {
+                acc.extend(req.resources());
+                acc
+            }),
+            AggregateRequirement::None(reqs) => reqs.iter().fold(HashSet::new(), |mut acc, req| {
+                acc.extend(req.resources());
+                acc
+            }),
+        }
+    }
+
     fn is_satisfied(
         &self,
         interval: Interval,
@@ -76,6 +95,13 @@ pub enum SingleRequirement {
 }
 
 impl Satisfiable for SingleRequirement {
+    fn resources(&self) -> HashSet<Resource> {
+        match self {
+            SingleRequirement::Offset { resource, .. } => HashSet::from([resource.to_owned()]),
+            SingleRequirement::File { path } => HashSet::new(),
+        }
+    }
+
     fn is_satisfied(
         &self,
         interval: Interval,
@@ -143,6 +169,13 @@ impl Satisfiable for Requirement {
         match self {
             Requirement::One(req) => req.can_be_satisfied(interval, schedule, available),
             Requirement::Group(req) => req.can_be_satisfied(interval, schedule, available),
+        }
+    }
+
+    fn resources(&self) -> HashSet<Resource> {
+        match self {
+            Requirement::One(req) => req.resources(),
+            Requirement::Group(req) => req.resources(),
         }
     }
 }

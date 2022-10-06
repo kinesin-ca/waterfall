@@ -123,9 +123,11 @@ async fn main() -> std::io::Result<()> {
 
     debug!("Config: {:?}", args);
 
+    let (_runner_tx, runner_rx) = mpsc::unbounded_channel();
     let mut runner = Runner::new(
         tasks,
         world_def.variables,
+        runner_rx,
         exe_tx.clone(),
         storage_tx.clone(),
         world_def.output_options,
@@ -134,8 +136,7 @@ async fn main() -> std::io::Result<()> {
     .await
     .unwrap();
 
-    let (wtx, wrx) = oneshot::channel();
-    runner.run(wrx).await;
+    runner.run().await;
 
     exe_tx.send(ExecutorMessage::Stop {}).unwrap();
     exe_handle.await.unwrap();
