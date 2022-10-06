@@ -6,6 +6,9 @@ pub async fn start_storage(mut msgs: mpsc::UnboundedReceiver<StorageMessage>) ->
     while let Some(msg) = msgs.recv().await {
         use StorageMessage::*;
         match msg {
+            Clear {} => {
+                current_state = ResourceInterval::new();
+            }
             StoreAttempt { .. } => {}
             StoreState { state } => {
                 current_state = state;

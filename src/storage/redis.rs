@@ -17,22 +17,35 @@ pub async fn start_redis_storage(
     while let Some(msg) = msgs.recv().await {
         use StorageMessage::*;
         match msg {
+            Clear {} => {
+                let mut keys = Vec::new();
+                {
+                    let mut iter: redis::AsyncIter<String> =
+                        conn.scan_match(format!("{}:*", prefix)).await?;
+                    while let Some(key) = iter.next_item().await {
+                        keys.push(key);
+                    }
+                }
+                for key in keys {
+                    conn.del(key).await?;
+                }
+            }
             StoreAttempt {
                 task_name,
                 interval,
                 attempt,
             } => {
-                let tag = format!("{}_{}_{}", prefix, task_name, interval.end);
+                let tag = format!("{}:{}_{}", prefix, task_name, interval.end);
                 let payload = serde_json::to_string(&attempt).unwrap();
                 conn.rpush(&tag, &payload).await?;
             }
             StoreState { state } => {
-                let tag = format!("{}_state", prefix);
+                let tag = format!("{}:state", prefix);
                 let payload = serde_json::to_string(&state).unwrap();
                 conn.set(&tag, &payload).await?;
             }
             LoadState { response } => {
-                let tag = format!("{}_state", prefix);
+                let tag = format!("{}:state", prefix);
                 let payload: String = conn.get(&tag).await.unwrap_or("{}".to_owned());
                 let is: ResourceInterval = serde_json::from_str(&payload).unwrap();
                 response.send(is).unwrap();
