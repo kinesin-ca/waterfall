@@ -39,13 +39,11 @@ pub enum RunnerMessage {
     RetryAction {
         action_id: usize,
     },
-    /*
     /// Marks all resources in the set available over the interval
     ForceUp {
         resources: HashSet<String>,
         interval: Interval,
     },
-    */
     /// Marks all resources in the set as down over _at least_ the interval.
     /// Will cause a re-check / re-gen
     ForceDown {
@@ -342,13 +340,26 @@ impl Runner {
                     self.events
                         .push(delayed_event(Duration::seconds(5), RunnerMessage::Tick));
                 }
-                /*
                 Some(Ok(RunnerMessage::ForceUp {
                     resources,
                     interval,
                 })) => {
+                    for (tid, task) in self.tasks.iter().enumerate() {
+                        if task.provides.is_subset(&resources) {
+                            let aligned_is =
+                                IntervalSet::from(task.schedule.align_interval(interval));
+                            for resource in &task.provides {
+                                self.current.get_mut(resource).unwrap().merge(&aligned_is);
+                            }
+                            for action in &mut self.actions {
+                                if action.task == tid && aligned_is.has_subset(action.interval) {
+                                    action.state = ActionState::Completed;
+                                }
+                            }
+                        }
+                    }
+                    self.store_state();
                 }
-                */
                 Some(Ok(RunnerMessage::ForceDown {
                     resources,
                     interval,
