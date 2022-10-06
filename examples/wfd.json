@@ -1,0 +1,17 @@
+{
+  "server": {
+    "ip": "127.0.0.1",
+    "port": 2503
+  },
+  "storage": {
+    "type": "redis",
+    "url": "redis://localhost",
+    "prefix": "another"
+  },
+  "executor": {
+    "type": "local",
+    "workers": 10
+  }
+}
+
+
