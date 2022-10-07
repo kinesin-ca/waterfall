@@ -1,13 +1,13 @@
 <script>
 export default {
-  props: ['refreshSeconds', 'daggydURL'],
+  props: ['refreshSeconds', 'waterfallURL'],
   data() {
     return {
       interval: this.refreshSeconds,
-      url: this.daggydURL,
+      url: this.waterfallURL,
     };
   },
-  emits: ['update-refresh-interval', 'update-daggyd-url'],
+  emits: ['update-refresh-interval', 'update-waterfall-url'],
   computed: {
     validRefreshIntervals() {
       return [5, 10, 15, 30, 60, 300, 600];
@@ -22,19 +22,20 @@ export default {
 <template>
   <details>
     <summary>Global Settings</summary>
-      <label>
-        Daggy Base URL
-        <input @change="$emit('update-daggyd-url', url)" v-model="url"/>
-      </label>
-      <label>Refresh Interval (seconds)
-        <select @change="$emit('update-refresh-interval', interval)" v-model="interval">
-          <option v-for="interval in validRefreshIntervals"
-            :key="interval"
-            :value="interval"
-            >
-            {{ interval }} Seconds
-            </option>
-        </select>
-      </label>
+    <label>
+      Waterfall Base URL
+      <input @change="$emit('update-waterfall-url', url)" v-model="url"/>
+    </label>
+    <label>
+      Refresh Interval (seconds)
+      <select @change="$emit('update-refresh-interval', interval)" v-model="interval">
+        <option v-for="interval in validRefreshIntervals"
+                :key="interval"
+                :value="interval"
+                >
+                {{ interval }} Seconds
+        </option>
+      </select>
+    </label>
   </details>
 </template>

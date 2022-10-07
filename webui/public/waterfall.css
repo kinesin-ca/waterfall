@@ -2,18 +2,6 @@
   --base-fontsize: 1.0rem;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --accent-bg: #F3F3F3;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent-bg: #3F3F3F;
-  }
-}
-
 body {
   max-width: 100%;
   padding: 0px;

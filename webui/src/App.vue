@@ -1,29 +1,35 @@
 <script>
-import RunExplorer from './components/RunExplorer.vue'
+import Timeline from './components/Timeline.vue'
 import GlobalSettings from './components/GlobalSettings.vue'
+import SegmentDetails from './components/SegmentDetails.vue'
 
 export default {
   data() {
     return {
       refreshSeconds: 15,  // How often to refresh
-      daggydURL: window.location.origin,
+      waterfallURL: 'http://localhost:2503',
+      activeSegment: null,
     }
   },
 
   methods: {
     updateURL(url) {
-      this.daggydURL = url;
+      this.waterfallURL = url;
     },
     updateRefreshInterval(interval) {
       this.refreshSeconds = interval;
+    },
+    setActiveSegment(segment) {
+      this.activeSegment = segment;
     },
   },
 
   components: {
     GlobalSettings,
-    RunExplorer
-  }
-}
+    Timeline,
+    SegmentDetails,
+  },
+};
 </script>
 
 <style>
@@ -32,19 +38,23 @@ input { max-width: 25%; }
 </style>
 
 <template>
-  <div id="settings">
     <GlobalSettings
-      :daggydURL="daggydURL"
+      :waterfallURL="waterfallURL"
       :refreshSeconds="refreshSeconds"
       @update-refresh-interval="(interval) => this.updateRefreshInterval(interval)"
-      @update-daggyd-url="(url) => this.updateURL(url)"
+      @update-waterfall-url="(url) => this.updateURL(url)"
       />
-  </div>
-  <div id="explorer">
-    <RunExplorer
+  <br/>
+  <div>
+    <Timeline
+      :waterfallURL="waterfallURL"
       :refreshSeconds="refreshSeconds"
-      :daggydURL="daggydURL"
-      @new-active-run="(runID) => this.activeRunID = runID"
+      @update-active-segment="(segment) => this.setActiveSegment(segment)"
     />
   </div>
+  <br/>
+  <SegmentDetails
+    v-if="this.activeSegment !== null"
+    :activeSegment="activeSegment"
+    />
 </template>
