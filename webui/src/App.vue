@@ -6,7 +6,7 @@ import SegmentDetails from './components/SegmentDetails.vue'
 export default {
   data() {
     return {
-      refreshSeconds: 15,  // How often to refresh
+      refreshSeconds: 1,  // How often to refresh
       waterfallURL: 'http://localhost:2503',
       activeSegment: null,
       maxDisplayIntervals: 500,

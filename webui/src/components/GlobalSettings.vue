@@ -11,7 +11,7 @@ export default {
   emits: ['update-refresh-interval', 'update-waterfall-url', 'update-max-intervals'],
   computed: {
     validRefreshIntervals() {
-      return [5, 10, 15, 30, 60, 300, 600];
+      return [1, 5, 10, 15, 30, 60, 300, 600];
     },
     validDisplayIntervals() {
       return [0, 100, 250, 500, 1000, 1500];

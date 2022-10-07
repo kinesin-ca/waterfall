@@ -67,6 +67,7 @@ export default {
 
           this.data = payload;
           this.chart.data(payload);
+          this.chart.reresh();
         })
         .catch(err => { throw err });
     },
