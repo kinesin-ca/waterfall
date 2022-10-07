@@ -13,7 +13,7 @@ use std::collections::VecDeque;
         - current = TaskSet::coverage (the theoretical)
 */
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum ActionState {
     Queued,
     Running,
@@ -21,7 +21,7 @@ pub enum ActionState {
     Completed,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct Action {
     task: usize,
     interval: Interval,
@@ -37,8 +37,7 @@ pub struct RunnerState {
 
 // Eventually we want to coerce the data into this format for timelines-chart
 // Resource (group) -> Task (label) -> data [ { "timeRange": [date,date], "val": state } ]
-pub type ResourceStateDetails =
-    HashMap<Resource, HashMap<String, Vec<(DateTime<Utc>, DateTime<Utc>, ActionState)>>>;
+pub type ResourceStateDetails = HashMap<Resource, HashMap<String, Vec<Action>>>;
 
 #[derive(Debug)]
 pub enum RunnerMessage {
@@ -368,12 +367,13 @@ impl Runner {
         response: oneshot::Sender<ResourceStateDetails>,
     ) {
         // HashMap<Resource, HashMap<String, Vec<(DateTime<Utc>, DateTime<Utc>, ActionState)>>>;
-        let mut res : ResourceStateDetails = HashMap::new();
+        let mut res: ResourceStateDetails = HashMap::new();
 
-        let all_resources : HashSet<Resource> = self.tasks.iter().fold(HashSet::new(), |mut acc, t| {
-            acc.extend(t.provides.clone());
-            acc
-        });
+        let all_resources: HashSet<Resource> =
+            self.tasks.iter().fold(HashSet::new(), |mut acc, t| {
+                acc.extend(t.provides.clone());
+                acc
+            });
 
         // Build out the hash
         for resource in all_resources {
@@ -386,25 +386,25 @@ impl Runner {
             res.insert(resource.clone(), res_ints);
         }
 
-        let actions = self
+        let actions: Vec<Action> = self
             .actions
             .iter()
             .filter(|x| interval.is_contiguous(x.interval))
+            .cloned()
             .collect();
-
 
         for action in actions {
             let task = &self.tasks[action.task];
-            for resource in task.provides {
-                res.entry(resource.clone()).or_insert(HashMap::new()).entry(task.name).or_insert(Hash
+            for resource in &task.provides {
+                res.get_mut(resource)
+                    .unwrap()
+                    .get_mut(&task.name)
+                    .unwrap()
+                    .push(action);
             }
         }
 
-        for task in &self.tasks {
-            for resource in &task.provides {}
-        }
-
-        response.send(res);
+        response.send(res).unwrap();
     }
 
     pub async fn run(&mut self, mut stay_up: bool) {

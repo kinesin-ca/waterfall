@@ -105,6 +105,42 @@ async fn get_state(state: web::Data<AppState>) -> impl Responder {
     }
 }
 
+/*
+  Generates the data structure for [timelines-chart](https://github.com/vasturiano/timelines-chart)
+
+  [
+    {
+        "group": "resource",
+        "data": [
+            {
+                label: "task_name",
+                "data": [
+                    {
+                        "timeRange": [ "start", "end" ],
+                        "val": "State"
+                    },
+                ]
+            }
+        ]
+    }
+]
+*/
+
+struct TimelineInterval {
+    time_range: [DateTime<Utc>; 2],
+    val: ActionState,
+}
+
+struct TimelineLabel {
+    label: String,
+    data: Vec<TimelineInterval>,
+}
+
+struct TimelineGroup {
+    group: String,
+    data: Vec<TimelineLabel>,
+}
+
 async fn timeline(span: web::Query<Interval>, state: web::Data<AppState>) -> impl Responder {
     let interval = span.into_inner();
 
