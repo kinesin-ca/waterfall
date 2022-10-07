@@ -17,6 +17,7 @@ impl TaskSet {
     pub fn validate(&self) -> Result<()> {
         let state = self.coverage();
 
+        // Ensures that all requirements are met
         for task in &self.0 {
             for resource in task.requires_resources() {
                 if !state.contains_key(&resource) {
@@ -28,6 +29,8 @@ impl TaskSet {
                 }
             }
         }
+
+        // TODO Ensure that all resources will be produced over the valid_over interval
 
         // validate that no task generates the same resource on overlapping times
         let providers: HashMap<Resource, Vec<usize>> =

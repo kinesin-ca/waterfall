@@ -1,0 +1,35 @@
+:root {
+  --base-fontsize: 1.0rem;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --accent-bg: #F3F3F3;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent-bg: #3F3F3F;
+  }
+}
+
+body {
+  max-width: 100%;
+  padding: 0px;
+  margin: 0px;
+}
+
+pre {
+  font-size: 1.0rem;
+}
+
+#app {
+  flex-flow: column wrap;
+}
+
+.svgicon {
+  height: 1em;
+  width: auto;
+  padding: 2px;
+}
