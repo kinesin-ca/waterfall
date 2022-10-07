@@ -12,6 +12,7 @@ export default {
           <th>Resource</th>
           <th>Task Name</th>
           <th>Interval</th>
+          <th>State</th>
         </tr>
       </thead>
       <tbody>
@@ -19,6 +20,7 @@ export default {
           <td>{{activeSegment.group}}</td>
           <td>{{activeSegment.label}}</td>
           <td>{{activeSegment.timeRange}}</td>
+          <td>{{activeSegment.val}}</td>
         </tr>
       </tbody>
     </table>

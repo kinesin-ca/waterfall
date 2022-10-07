@@ -197,6 +197,60 @@ async fn get_detailed_timeline(
     }
 }
 
+/// Retrieve all data about a segment, including:
+///     What resources it relies on
+///     Last attempt (if any)
+async fn get_segment_details(
+    span: web::Json<Interval>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let interval = span.into_inner();
+
+    let (response, rx) = oneshot::channel();
+    state
+        .runner_tx
+        .send(RunnerMessage::GetResourceStateDetails { interval, response })
+        .unwrap();
+
+    match rx.await {
+        Ok(actions) => {
+            let mut timeline = Vec::new();
+            info!(
+                "Querying for actions over {}, got {} responses.",
+                interval,
+                actions.len()
+            );
+
+            for (resource, tasks) in actions {
+                let mut group = TimelineGroup {
+                    group: resource.clone(),
+                    data: Vec::new(),
+                };
+                for (task_name, intervals) in tasks.into_iter() {
+                    let data = intervals
+                        .into_iter()
+                        .map(|a| TimelineInterval {
+                            time_range: [a.interval.start, a.interval.end],
+                            val: a.state,
+                        })
+                        .collect();
+
+                    group.data.push(TimelineLabel {
+                        label: task_name,
+                        data,
+                    });
+                }
+                timeline.push(group);
+            }
+
+            HttpResponse::Ok().json(timeline)
+        }
+        Err(error) => HttpResponse::BadRequest().json(SimpleError {
+            error: format!("{:?}", error),
+        }),
+    }
+}
+
 /*
 async fn stop_run(path: web::Path<RunID>, state: web::Data<AppState>) -> impl Responder {
     let run_id = path.into_inner();

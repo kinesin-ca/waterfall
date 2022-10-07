@@ -1,12 +1,28 @@
 <script>
 // import TimelinesChart from 'timelines-chart';
 
+function lexsort(a, b, keyfunc) {
+  const ka = keyfunc(a);
+  const kb = keyfunc(b);
+
+
+  let ret = 0;
+  if (ka < kb) { ret = -1; }
+  if (ka > kb) { ret =  1; }
+  return ret;
+}
+
+const MIN_TIME="1970-01-01T00:00:00Z";
+const MAX_TIME="2099-01-01T00:00:00Z";
+
 export default {
   props: ['waterfallURL', 'refreshSeconds'],
   data() {
     return {
       chart: null,
       data: {},
+      start: MIN_TIME,
+      end: MAX_TIME,
     }
   },
  
@@ -26,7 +42,7 @@ export default {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: '{ "start": "2021-09-01T00:00:00Z", "end": "2022-10-01T00:00:00Z" }'
+        body: `{ "start": "${this.start}", "end": "${this.end}" }`
       })
         .then((response) =>  {
           if (!response.ok) {
@@ -36,12 +52,15 @@ export default {
         })
         .then((payload) => {
           payload.map((group) => {
+            group.data.sort((a, b) => lexsort(a, b, (v) => v.label));
             Object.values(group.data).map((label) => {
               label.data.map((interval) => {
                 interval.timeRange = interval.timeRange.map((t) => new Date(t));
               })
             })
           });
+          payload.sort((a, b) => lexsort(a, b, (v) => v.group));
+
           this.data = payload;
           this.chart.data(payload);
         })
@@ -54,6 +73,17 @@ export default {
         this.update();
       }, this.refreshSeconds * 1000);
     },
+
+      setVisibleRange(dateRange) {
+        if (dateRange === null) {
+          this.start = MIN_TIME;
+          this.end = MAX_TIME;
+        } else {
+          this.start = dateRange[0].toISOString();
+          this.end = dateRange[1].toISOString();
+        }
+        this.fetchTimeline();
+      }
   },
 
   mounted() {
@@ -62,6 +92,7 @@ export default {
             .zScaleLabel('State')
             .zQualitative(true)
             .useUtc(false)
+            .onZoom((dateRange, _) => this.setVisibleRange(dateRange))
             .onSegmentClick((segment) => this.$emit('updateActiveSegment', segment) );
     this.update();
   },
