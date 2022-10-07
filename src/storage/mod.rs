@@ -1,5 +1,6 @@
 use super::*;
 use crate::executors::TaskAttempt;
+use crate::runner::ActionState;
 
 /// Messages for interacting with an Executor
 #[derive(Debug)]

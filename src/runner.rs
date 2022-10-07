@@ -24,8 +24,8 @@ pub enum ActionState {
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct Action {
     task: usize,
-    interval: Interval,
-    state: ActionState,
+    pub interval: Interval,
+    pub state: ActionState,
     // kill: Option<oneshot::Receiver<()>>,
 }
 
@@ -273,7 +273,8 @@ impl Runner {
             let res = rx.await.unwrap();
             res
         };
-        let target = current.clone();
+        // let target = current.clone();
+        let target = ResourceInterval::new();
 
         let end_state = tasks.coverage();
         let mut runner = Runner {
@@ -306,6 +307,15 @@ impl Runner {
                 .iter()
                 .enumerate()
                 .fold(Vec::new(), |mut acc, (idx, task)| {
+                    let get_state = |intv: Interval| {
+                        if task.provides.iter().all(|res| {
+                            self.current.contains_key(res) && self.current[res].has_subset(intv)
+                        }) {
+                            ActionState::Completed
+                        } else {
+                            ActionState::Queued
+                        }
+                    };
                     let res: Vec<Action> = task
                         .generate_intervals(&new_required)
                         .unwrap()
@@ -314,7 +324,7 @@ impl Runner {
                             |interval| Action {
                                 task: idx,
                                 interval,
-                                state: ActionState::Queued,
+                                state: get_state(interval),
                             }
                         })
                         .collect();
@@ -392,6 +402,12 @@ impl Runner {
             .filter(|x| interval.is_contiguous(x.interval))
             .cloned()
             .collect();
+
+        info!(
+            "Filtered {} actions down to {}",
+            self.actions.len(),
+            actions.len()
+        );
 
         for action in actions {
             let task = &self.tasks[action.task];

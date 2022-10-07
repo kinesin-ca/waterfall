@@ -1,6 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{error, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
 use clap::Parser;
+use log::*;
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::{mpsc, oneshot};
@@ -126,22 +127,29 @@ async fn get_state(state: web::Data<AppState>) -> impl Responder {
 ]
 */
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct TimelineInterval {
     time_range: [DateTime<Utc>; 2],
     val: ActionState,
 }
 
+#[derive(Serialize)]
 struct TimelineLabel {
     label: String,
     data: Vec<TimelineInterval>,
 }
 
+#[derive(Serialize)]
 struct TimelineGroup {
     group: String,
     data: Vec<TimelineLabel>,
 }
 
-async fn timeline(span: web::Query<Interval>, state: web::Data<AppState>) -> impl Responder {
+async fn get_detailed_timeline(
+    span: web::Json<Interval>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let interval = span.into_inner();
 
     let (response, rx) = oneshot::channel();
@@ -151,7 +159,38 @@ async fn timeline(span: web::Query<Interval>, state: web::Data<AppState>) -> imp
         .unwrap();
 
     match rx.await {
-        Ok(world) => HttpResponse::Ok().json(world),
+        Ok(actions) => {
+            let mut timeline = Vec::new();
+            info!(
+                "Querying for actions over {}, got {} responses.",
+                interval,
+                actions.len()
+            );
+
+            for (resource, tasks) in actions {
+                let mut group = TimelineGroup {
+                    group: resource.clone(),
+                    data: Vec::new(),
+                };
+                for (task_name, intervals) in tasks.into_iter() {
+                    let data = intervals
+                        .into_iter()
+                        .map(|a| TimelineInterval {
+                            time_range: [a.interval.start, a.interval.end],
+                            val: a.state,
+                        })
+                        .collect();
+
+                    group.data.push(TimelineLabel {
+                        label: task_name,
+                        data,
+                    });
+                }
+                timeline.push(group);
+            }
+
+            HttpResponse::Ok().json(timeline)
+        }
         Err(error) => HttpResponse::BadRequest().json(SimpleError {
             error: format!("{:?}", error),
         }),
@@ -295,7 +334,11 @@ async fn main() -> std::io::Result<()> {
             ))
             .app_data(json_config)
             .route("/ready", web::get().to(ready))
-            .service(web::scope("/api/v1/").route("", web::get().to(get_state)))
+            .service(
+                web::scope("/api/v1")
+                    .route("/state", web::get().to(get_state))
+                    .route("/details", web::post().to(get_detailed_timeline)),
+            )
     })
     .bind(config.server.listen_spec())?
     .run()

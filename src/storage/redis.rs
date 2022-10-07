@@ -39,6 +39,18 @@ pub async fn start_redis_storage(
                 let payload = serde_json::to_string(&attempt).unwrap();
                 conn.rpush(&tag, &payload).await?;
             }
+            /*
+            SetTaskIntervalState {
+                task_name,
+                interval,
+                state,
+            } => {
+                let map = format!("{}:task_interval_states", prefix);
+                let key = format!("{}_{}-{}", task_name, interval.start, interval.end);
+                let value = serde_json::to_string(&state).unwrap();
+                conn.hset(&map, &key, &value).await?;
+            }
+            */
             StoreState { state } => {
                 let tag = format!("{}:state", prefix);
                 let payload = serde_json::to_string(&state).unwrap();
