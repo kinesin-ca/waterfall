@@ -146,16 +146,28 @@ struct TimelineGroup {
     data: Vec<TimelineLabel>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct DetailedTimelineOptions {
+    #[serde(default)]
+    max_intervals: Option<usize>,
+}
+
 async fn get_detailed_timeline(
+    options: web::Query<DetailedTimelineOptions>,
     span: web::Json<Interval>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let interval = span.into_inner();
+    let max_intervals = options.into_inner().max_intervals;
 
     let (response, rx) = oneshot::channel();
     state
         .runner_tx
-        .send(RunnerMessage::GetResourceStateDetails { interval, response })
+        .send(RunnerMessage::GetResourceStateDetails {
+            interval,
+            response,
+            max_intervals,
+        })
         .unwrap();
 
     match rx.await {
@@ -201,32 +213,34 @@ async fn get_detailed_timeline(
 ///     What resources it relies on
 ///     Last attempt (if any)
 async fn get_segment_details(
+    max_intervals: web::Query<Option<usize>>,
     span: web::Json<Interval>,
     state: web::Data<AppState>,
 ) -> impl Responder {
+    /*
     let interval = span.into_inner();
 
     let (response, rx) = oneshot::channel();
     state
         .runner_tx
-        .send(RunnerMessage::GetResourceStateDetails { interval, response })
+        .send(RunnerMessage::GetResourceStateDetails {
+            interval,
+            response,
+            max_intervals: max_intervals.into_inner(),
+        })
         .unwrap();
 
     match rx.await {
         Ok(actions) => {
             let mut timeline = Vec::new();
-            info!(
-                "Querying for actions over {}, got {} responses.",
-                interval,
-                actions.len()
-            );
-
             for (resource, tasks) in actions {
                 let mut group = TimelineGroup {
                     group: resource.clone(),
                     data: Vec::new(),
                 };
-                for (task_name, intervals) in tasks.into_iter() {
+                for (task_name, mut intervals) in tasks.into_iter() {
+                    // Collapse intervals
+                    if intervals.len() > 50 {}
                     let data = intervals
                         .into_iter()
                         .map(|a| TimelineInterval {
@@ -249,6 +263,8 @@ async fn get_segment_details(
             error: format!("{:?}", error),
         }),
     }
+    */
+    HttpResponse::Ok()
 }
 
 /*

@@ -16,7 +16,7 @@ const MIN_TIME="1970-01-01T00:00:00Z";
 const MAX_TIME="2099-01-01T00:00:00Z";
 
 export default {
-  props: ['waterfallURL', 'refreshSeconds'],
+  props: ['waterfallURL', 'refreshSeconds', 'maxDisplayIntervals'],
   data() {
     return {
       chart: null,
@@ -33,11 +33,15 @@ export default {
     waterfallURL() {
       this.fetchTimeline();
     },
+    maxDisplayIntervals() {
+      this.fetchTimeline();
+    },
+
   },
 
   methods: {
     async fetchTimeline() {
-      fetch(`${this.waterfallURL}/api/v1/details`, {
+      fetch(`${this.waterfallURL}/api/v1/details?max_intervals=${this.maxDisplayIntervals}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

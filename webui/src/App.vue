@@ -9,6 +9,7 @@ export default {
       refreshSeconds: 15,  // How often to refresh
       waterfallURL: 'http://localhost:2503',
       activeSegment: null,
+      maxDisplayIntervals: 500,
     }
   },
 
@@ -19,6 +20,10 @@ export default {
     updateRefreshInterval(interval) {
       this.refreshSeconds = interval;
     },
+    updateMaxDisplayIntervals(cnt) {
+      this.maxDisplayIntervals = cnt;
+    },
+
     setActiveSegment(segment) {
       this.activeSegment = segment;
     },
@@ -41,14 +46,17 @@ input { max-width: 25%; }
     <GlobalSettings
       :waterfallURL="waterfallURL"
       :refreshSeconds="refreshSeconds"
+      :maxDisplayIntervals="maxDisplayIntervals"
       @update-refresh-interval="(interval) => this.updateRefreshInterval(interval)"
       @update-waterfall-url="(url) => this.updateURL(url)"
+      @update-max-display-intervals="(cnt) => this.updateMaxDisplayIntervals(cnt)"
       />
   <br/>
   <div>
     <Timeline
       :waterfallURL="waterfallURL"
       :refreshSeconds="refreshSeconds"
+      :maxDisplayIntervals="maxDisplayIntervals"
       @update-active-segment="(segment) => this.setActiveSegment(segment)"
     />
   </div>

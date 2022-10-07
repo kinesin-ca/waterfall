@@ -1,6 +1,7 @@
 use super::*;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::StreamExt;
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 
 /*
@@ -13,7 +14,7 @@ use std::collections::VecDeque;
         - current = TaskSet::coverage (the theoretical)
 */
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, PartialOrd)]
 pub enum ActionState {
     Queued,
     Running,
@@ -67,6 +68,7 @@ pub enum RunnerMessage {
     GetResourceStateDetails {
         interval: Interval,
         response: oneshot::Sender<ResourceStateDetails>,
+        max_intervals: Option<usize>,
     },
     Stop,
 }
@@ -237,6 +239,40 @@ fn delayed_event(delay: Duration, event: RunnerMessage) -> tokio::task::JoinHand
     })
 }
 
+// Coalesces adjascent actions
+fn coalesce_actions(mut actions: Vec<Action>) -> Vec<Action> {
+    if actions.is_empty() {
+        return actions;
+    }
+
+    actions.sort_unstable_by(|a, b| {
+        let ord = a.task.partial_cmp(&b.task).unwrap();
+        if ord == Ordering::Equal {
+            a.state.partial_cmp(&b.state).unwrap()
+        } else {
+            ord
+        }
+    });
+
+    let mut res: Vec<Action> = Vec::new();
+    for group in actions.group_by(|a, b| a.task == b.task && a.state == b.state) {
+        let intervals: Vec<Interval> = group.iter().map(|x| x.interval).collect();
+        let is = IntervalSet::from(intervals);
+        let task = group.first().unwrap().task;
+        let state = group.first().unwrap().state;
+
+        for interval in is.iter() {
+            res.push(Action {
+                task: task,
+                state: state,
+                interval: *interval,
+            })
+        }
+    }
+
+    res
+}
+
 impl Runner {
     pub async fn new(
         tasks: TaskSet,
@@ -375,6 +411,7 @@ impl Runner {
         &self,
         interval: Interval,
         response: oneshot::Sender<ResourceStateDetails>,
+        max_intervals: Option<usize>,
     ) {
         // HashMap<Resource, HashMap<String, Vec<(DateTime<Utc>, DateTime<Utc>, ActionState)>>>;
         let mut res: ResourceStateDetails = HashMap::new();
@@ -396,12 +433,18 @@ impl Runner {
             res.insert(resource.clone(), res_ints);
         }
 
-        let actions: Vec<Action> = self
+        let mut actions: Vec<Action> = self
             .actions
             .iter()
             .filter(|x| interval.is_contiguous(x.interval))
             .cloned()
             .collect();
+
+        if let Some(max_intv) = max_intervals {
+            if actions.len() > max_intv {
+                actions = coalesce_actions(actions);
+            }
+        }
 
         info!(
             "Filtered {} actions down to {}",
@@ -444,8 +487,12 @@ impl Runner {
                 Some(Ok(RunnerMessage::Tick)) => {
                     self.tick();
                 }
-                Some(Ok(RunnerMessage::GetResourceStateDetails { interval, response })) => {
-                    self.get_resource_state_details(interval, response);
+                Some(Ok(RunnerMessage::GetResourceStateDetails {
+                    interval,
+                    response,
+                    max_intervals,
+                })) => {
+                    self.get_resource_state_details(interval, response, max_intervals);
                 }
                 Some(Ok(RunnerMessage::ForceUp {
                     resources,

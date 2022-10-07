@@ -1,16 +1,20 @@
 <script>
 export default {
-  props: ['refreshSeconds', 'waterfallURL'],
+  props: ['refreshSeconds', 'waterfallURL', 'maxDisplayIntervals'],
   data() {
     return {
       interval: this.refreshSeconds,
       url: this.waterfallURL,
+      max_display_intervals: this.maxDisplayIntervals,
     };
   },
-  emits: ['update-refresh-interval', 'update-waterfall-url'],
+  emits: ['update-refresh-interval', 'update-waterfall-url', 'update-max-intervals'],
   computed: {
     validRefreshIntervals() {
       return [5, 10, 15, 30, 60, 300, 600];
+    },
+    validDisplayIntervals() {
+      return [0, 100, 250, 500, 1000, 1500];
     },
     isSelected(interval) {
       return (interval === this.refreshSeconds ? 'selected' : 'unselected');
@@ -37,5 +41,17 @@ export default {
         </option>
       </select>
     </label>
+    <label>
+      Max Display Intervals
+      <select @change="$emit('update-max-display-intervals', max_display_intervals)" v-model="max_display_intervals">
+        <option v-for="cnt in validDisplayIntervals"
+                :key="cnt"
+                :value="cnt"
+                >
+                {{ cnt }} Segments
+        </option>
+      </select>
+    </label>
+
   </details>
 </template>
