@@ -13,7 +13,6 @@ use std::collections::VecDeque;
         - A Stop message is sent
         - current = TaskSet::coverage (the theoretical)
 */
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, PartialOrd)]
 pub enum ActionState {
     Queued,
@@ -255,7 +254,7 @@ fn coalesce_actions(mut actions: Vec<Action>) -> Vec<Action> {
     });
 
     let mut res: Vec<Action> = Vec::new();
-    for group in actions.group_by(|a, b| a.task == b.task && a.state == b.state) {
+    for group in actions.chunk_by(|a, b| a.task == b.task && a.state == b.state) {
         let intervals: Vec<Interval> = group.iter().map(|x| x.interval).collect();
         let is = IntervalSet::from(intervals);
         let task = group.first().unwrap().task;
@@ -263,8 +262,8 @@ fn coalesce_actions(mut actions: Vec<Action>) -> Vec<Action> {
 
         for interval in is.iter() {
             res.push(Action {
-                task: task,
-                state: state,
+                task,
+                state,
                 interval: *interval,
             })
         }
@@ -336,7 +335,9 @@ impl Runner {
 
     // Generate a new target state and generate any required actions
     pub fn update_target(&mut self) {
-        let new_target = self.tasks.get_state(Utc::now() + Duration::days(1));
+        let new_target = self
+            .tasks
+            .get_state(Utc::now() + Duration::try_days(1).unwrap());
         let new_required = new_target.difference(&self.target);
         let mut new_actions =
             self.tasks
@@ -377,7 +378,8 @@ impl Runner {
         debug!("Tick");
         // Enqueue new messages
         while let Ok(msg) = self.messages.try_recv() {
-            self.events.push(delayed_event(Duration::seconds(0), msg));
+            self.events
+                .push(delayed_event(Duration::try_seconds(0).unwrap(), msg));
         }
         match self.actions.last() {
             Some(action) => {
@@ -392,17 +394,18 @@ impl Runner {
         self.queue_actions();
 
         self.events.push(delayed_event(
-            Duration::milliseconds(250),
+            Duration::try_milliseconds(250).unwrap(),
             RunnerMessage::Tick,
         ));
     }
 
     fn poll_messages(&mut self) {
         while let Ok(msg) = self.messages.try_recv() {
-            self.events.push(delayed_event(Duration::seconds(0), msg));
+            self.events
+                .push(delayed_event(Duration::try_seconds(0).unwrap(), msg));
         }
         self.events.push(delayed_event(
-            Duration::milliseconds(10),
+            Duration::try_milliseconds(10).unwrap(),
             RunnerMessage::PollMessages,
         ));
     }
@@ -580,7 +583,7 @@ impl Runner {
         } else {
             action.state = ActionState::Errored;
             self.events.push(delayed_event(
-                Duration::seconds(30),
+                Duration::try_seconds(30).unwrap(),
                 RunnerMessage::RetryAction { action_id },
             ));
         }

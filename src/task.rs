@@ -272,8 +272,8 @@ mod tests {
     macro_rules! intv {
         ( $x:literal, $y:literal ) => {
             Interval::new(
-                Utc.ymd(2022, 1, $x).and_hms(0, 0, 0),
-                Utc.ymd(2022, 1, $y).and_hms(0, 0, 0),
+                Utc.with_ymd_and_hms(2022, 1, $x, 0, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2022, 1, $y, 0, 0, 0).unwrap(),
             )
         };
     }
@@ -330,8 +330,8 @@ mod tests {
         assert_eq!(
             task.valid_over,
             IntervalSet::from(vec![Interval::new(
-                Halifax.ymd(2022, 1, 5).and_hms(9, 0, 0),
-                Halifax.ymd(2022, 1, 10).and_hms(15, 0, 0)
+                Halifax.with_ymd_and_hms(2022, 1, 5, 9, 0, 0).unwrap(),
+                Halifax.with_ymd_and_hms(2022, 1, 10, 15, 0, 0).unwrap()
             )])
         );
 
@@ -414,8 +414,8 @@ mod tests {
             assert_eq!(
                 task.valid_over,
                 IntervalSet::from(vec![Interval::new(
-                    New_York.ymd(2022, 1, 3).and_hms(17, 0, 0),
-                    New_York.ymd(2022, 1, 6).and_hms(17, 0, 0)
+                    New_York.with_ymd_and_hms(2022, 1, 3, 17, 0, 0).unwrap(),
+                    New_York.with_ymd_and_hms(2022, 1, 6, 17, 0, 0).unwrap()
                 )])
             );
         }
@@ -434,8 +434,8 @@ mod tests {
             assert_eq!(
                 task.valid_over,
                 IntervalSet::from(vec![Interval::new(
-                    New_York.ymd(2021, 12, 31).and_hms(12, 0, 0),
-                    New_York.ymd(2022, 1, 7).and_hms(12, 0, 0)
+                    New_York.with_ymd_and_hms(2021, 12, 31, 12, 0, 0).unwrap(),
+                    New_York.with_ymd_and_hms(2022, 1, 7, 12, 0, 0).unwrap()
                 )])
             );
         }

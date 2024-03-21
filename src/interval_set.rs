@@ -11,8 +11,8 @@ impl IntervalSet {
     }
 
     pub fn start(&self) -> Option<DateTime<Utc>> {
-        if let Some(intv) = self.first() {
-            Some(intv.start)
+        if let Some(interval) = self.first() {
+            Some(interval.start)
         } else {
             None
         }
@@ -203,11 +203,11 @@ impl BitAnd for IntervalSet {
 mod tests {
     use super::*;
 
-    macro_rules! intv {
+    macro_rules! interval {
         ( $x:literal, $y:literal ) => {
             Interval::new(
-                Utc.ymd(2022, 1, 1).and_hms($x, 0, 0),
-                Utc.ymd(2022, 1, 1).and_hms($y, 0, 0),
+                Utc.with_ymd_and_hms(2022, 1, 1, $x, 0, 0),
+                Utc.with_ymd_and_hms(2022, 1, 1, $y, 0, 0),
             )
         };
     }
@@ -218,14 +218,14 @@ mod tests {
 
     #[test]
     fn test_intervalset_difference() {
-        let isa = IntervalSet(vec![intv!(1, 3), intv!(5, 6)]);
+        let isa = IntervalSet(vec![interval!(1, 3), interval!(5, 6)]);
 
         // Removing the entire span
-        let full = IntervalSet(vec![intv!(1, 6)]);
+        let full = IntervalSet(vec![interval!(1, 6)]);
         assert_eq!(isa.difference(&full), IntervalSet(vec![]));
         assert_eq!(
-            isa.difference(&IntervalSet(vec![intv!(2, 5)])),
-            IntervalSet(vec![intv!(1, 2), intv!(5, 6)])
+            isa.difference(&IntervalSet(vec![interval!(2, 5)])),
+            IntervalSet(vec![interval!(1, 2), interval!(5, 6)])
         );
 
         // TODO need more tests here
@@ -234,16 +234,16 @@ mod tests {
     #[test]
     fn test_intervalset_complement() {
         // Complement's complement is the same
-        let is = IntervalSet(vec![intv!(2, 5), intv!(8, 20)]);
+        let is = IntervalSet(vec![interval!(2, 5), interval!(8, 20)]);
         assert_eq!(is.complement().complement(), is);
 
         // Complement with one end at min time
         let is = IntervalSet(vec![
             Interval::new(
                 DateTime::<Utc>::MIN_UTC,
-                Utc.ymd(2021, 12, 1).and_hms(0, 0, 0),
+                Utc.with_ymd_and_hms(2021, 12, 1, 0, 0, 0).unwrap(),
             ),
-            intv!(8, 20),
+            interval!(8, 20),
         ]);
         assert_eq!(is.complement().complement(), is);
     }

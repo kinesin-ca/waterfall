@@ -55,9 +55,9 @@ impl Calendar {
     pub fn offset(&self, mut date: NaiveDate, mut offset: i64) -> NaiveDate {
         let incr = if offset < 0 { 1 } else { -1 };
         while offset != 0 {
-            date = date + Duration::days(-1 * incr);
+            date = date + Duration::try_days(-1 * incr).unwrap();
             while !self.includes(date) {
-                date = date + Duration::days(-1 * incr);
+                date = date + Duration::try_days(-1 * incr).unwrap();
             }
             offset += incr;
         }
@@ -73,8 +73,8 @@ mod tests {
     fn check_next() {
         let cal = Calendar::new();
         assert_eq!(
-            cal.next(NaiveDate::from_ymd(2022, 1, 1)),
-            NaiveDate::from_ymd(2022, 1, 3)
+            cal.next(NaiveDate::from_ymd_opt(2022, 1, 1).unwrap()),
+            NaiveDate::from_ymd_opt(2022, 1, 3).unwrap()
         );
     }
 }

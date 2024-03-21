@@ -24,8 +24,7 @@ impl Schedule {
     fn is_end_time<T: TimeZone>(&self, dt: DateTime<T>) -> bool {
         // Need to get the current interval, then offset it
         let at = dt.with_timezone(&self.timezone);
-        self.times.iter().any(|x| *x == at.time())
-            && self.calendar.includes(at.date().naive_local())
+        self.times.iter().any(|x| *x == at.time()) && self.calendar.includes(at.date_naive())
     }
 
     /// Given an interval I, return the interval J that is the smallest
@@ -58,8 +57,8 @@ impl Schedule {
         //let st = interval.start.with_timezone(&self.timezone);
         //let et = interval.end.with_timezone(&self.timezone);
 
-        let mut date = self.calendar.prev(st.date().naive_local());
-        let end_date = self.calendar.next(et.date().succ().naive_local());
+        let mut date = self.calendar.prev(st.date_naive());
+        let end_date = self.calendar.next(et.date_naive().succ_opt().unwrap());
 
         let mut times = Vec::new();
         let mut prev_time = self
@@ -109,13 +108,13 @@ impl Schedule {
     pub fn next_time<T: TimeZone>(&self, dt: DateTime<T>) -> DateTime<Tz> {
         let st = dt.with_timezone(&self.timezone);
 
-        let mut date = st.date().naive_local();
+        let mut date = st.date_naive();
         let mut time = st.time();
 
         // Handle case where we're not on a valid date
         if !self.calendar.includes(date) {
             date = self.calendar.next(date);
-            time = self.times[0] - Duration::milliseconds(1);
+            time = self.times[0] - Duration::try_milliseconds(1).unwrap();
         }
 
         // Figure out the time slot
@@ -135,13 +134,13 @@ impl Schedule {
     pub fn prev_time<T: TimeZone>(&self, dt: DateTime<T>) -> DateTime<Tz> {
         let st = dt.with_timezone(&self.timezone);
 
-        let mut date = st.date().naive_local();
+        let mut date = st.date_naive();
         let mut time = st.time();
 
         // Handle case where we're not on a valid date
         if !self.calendar.includes(date) {
             date = self.calendar.prev(date);
-            time = *self.times.last().unwrap() + Duration::milliseconds(1);
+            time = *self.times.last().unwrap() + Duration::try_milliseconds(1).unwrap();
         }
 
         // Figure out the time slot
@@ -183,8 +182,8 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
@@ -192,12 +191,12 @@ mod tests {
         // Simple generation
         let times = sched.generate(Interval::new(
             timezone
-                .ymd(2022, 1, 3)
-                .and_hms(11, 0, 0)
+                .with_ymd_and_hms(2022, 1, 3, 11, 0, 0)
+                .unwrap()
                 .with_timezone(&Utc),
             timezone
-                .ymd(2022, 1, 3)
-                .and_hms(12, 0, 0)
+                .with_ymd_and_hms(2022, 1, 3, 12, 0, 0)
+                .unwrap()
                 .with_timezone(&Utc),
         ));
 
@@ -206,12 +205,12 @@ mod tests {
             times,
             vec![Interval::new(
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(10, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(11, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 11, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
             )]
         );
@@ -220,73 +219,73 @@ mod tests {
         assert_eq!(
             sched.generate(Interval::new(
                 timezone
-                    .ymd(2021, 12, 31)
-                    .and_hms(0, 0, 0)
+                    .with_ymd_and_hms(2021, 12, 31, 0, 0, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 5)
-                    .and_hms(0, 0, 0)
+                    .with_ymd_and_hms(2022, 1, 5, 0, 0, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
             )),
             vec![
                 Interval::new(
                     timezone
-                        .ymd(2021, 12, 30)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2021, 12, 30, 11, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                     timezone
-                        .ymd(2021, 12, 31)
-                        .and_hms(10, 30, 0)
-                        .with_timezone(&Utc),
-                ),
-                Interval::new(
-                    timezone
-                        .ymd(2021, 12, 31)
-                        .and_hms(10, 30, 0)
-                        .with_timezone(&Utc),
-                    timezone
-                        .ymd(2021, 12, 31)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2021, 12, 31, 10, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                 ),
                 Interval::new(
                     timezone
-                        .ymd(2021, 12, 31)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2021, 12, 31, 10, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                     timezone
-                        .ymd(2022, 1, 3)
-                        .and_hms(10, 30, 0)
-                        .with_timezone(&Utc),
-                ),
-                Interval::new(
-                    timezone
-                        .ymd(2022, 1, 3)
-                        .and_hms(10, 30, 0)
-                        .with_timezone(&Utc),
-                    timezone
-                        .ymd(2022, 1, 3)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2021, 12, 31, 11, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                 ),
                 Interval::new(
                     timezone
-                        .ymd(2022, 1, 3)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2021, 12, 31, 11, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                     timezone
-                        .ymd(2022, 1, 4)
-                        .and_hms(10, 30, 0)
+                        .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                 ),
                 Interval::new(
                     timezone
-                        .ymd(2022, 1, 4)
-                        .and_hms(10, 30, 0)
+                        .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                     timezone
-                        .ymd(2022, 1, 4)
-                        .and_hms(11, 30, 0)
+                        .with_ymd_and_hms(2022, 1, 3, 11, 30, 0)
+                        .unwrap()
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .with_ymd_and_hms(2022, 1, 3, 11, 30, 0)
+                        .unwrap()
+                        .with_timezone(&Utc),
+                    timezone
+                        .with_ymd_and_hms(2022, 1, 4, 10, 30, 0)
+                        .unwrap()
+                        .with_timezone(&Utc),
+                ),
+                Interval::new(
+                    timezone
+                        .with_ymd_and_hms(2022, 1, 4, 10, 30, 0)
+                        .unwrap()
+                        .with_timezone(&Utc),
+                    timezone
+                        .with_ymd_and_hms(2022, 1, 4, 11, 30, 0)
+                        .unwrap()
                         .with_timezone(&Utc),
                 )
             ]
@@ -299,19 +298,19 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
 
         assert_eq!(
-            sched.prev_time(timezone.ymd(2022, 1, 3).and_hms(11, 0, 0)),
-            timezone.ymd(2022, 1, 3).and_hms(10, 30, 0)
+            sched.prev_time(timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap()),
+            timezone.with_ymd_and_hms(2022, 1, 3, 10, 30, 0).unwrap()
         );
         assert_eq!(
-            sched.prev_time(timezone.ymd(2022, 1, 3).and_hms(11, 30, 0)),
-            timezone.ymd(2022, 1, 3).and_hms(10, 30, 0)
+            sched.prev_time(timezone.with_ymd_and_hms(2022, 1, 3, 11, 30, 0).unwrap()),
+            timezone.with_ymd_and_hms(2022, 1, 3, 10, 30, 0).unwrap()
         );
     }
 
@@ -321,20 +320,20 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
 
         // Asking for no offset should yield the same time
         assert_eq!(
-            sched.offset(timezone.ymd(2022, 1, 3).and_hms(11, 0, 0), 0),
-            timezone.ymd(2022, 1, 3).and_hms(11, 0, 0)
+            sched.offset(timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap(), 0),
+            timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap()
         );
 
         //  -1 is equivalent to prev
-        let test_time = timezone.ymd(2022, 1, 3).and_hms(11, 0, 0);
+        let test_time = timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap();
         assert_eq!(sched.offset(test_time, -1), sched.prev_time(test_time));
         assert_eq!(sched.offset(test_time, 1), sched.next_time(test_time));
     }
@@ -345,19 +344,19 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
 
         assert_eq!(
-            sched.next_time(timezone.ymd(2022, 1, 3).and_hms(11, 0, 0)),
-            timezone.ymd(2022, 1, 3).and_hms(11, 30, 0)
+            sched.next_time(timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap()),
+            timezone.with_ymd_and_hms(2022, 1, 3, 11, 30, 0).unwrap()
         );
         assert_eq!(
-            sched.next_time(timezone.ymd(2022, 1, 3).and_hms(11, 30, 0)),
-            timezone.ymd(2022, 1, 4).and_hms(10, 30, 0)
+            sched.next_time(timezone.with_ymd_and_hms(2022, 1, 3, 11, 30, 0).unwrap()),
+            timezone.with_ymd_and_hms(2022, 1, 4, 10, 30, 0).unwrap()
         );
     }
 
@@ -367,14 +366,14 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
 
         // prev and next are reversible
-        let dt = sched.prev_time(timezone.ymd(2022, 1, 3).and_hms(11, 0, 0)); // 10:30 -> 11:30
+        let dt = sched.prev_time(timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap()); // 10:30 -> 11:30
         assert_eq!(dt, sched.prev_time(sched.next_time(dt)));
     }
 
@@ -384,39 +383,39 @@ mod tests {
         let sched = Schedule {
             calendar: Calendar::new(),
             times: vec![
-                NaiveTime::from_hms(10, 30, 0),
-                NaiveTime::from_hms(11, 30, 0),
+                NaiveTime::from_hms_opt(10, 30, 0).unwrap(),
+                NaiveTime::from_hms_opt(11, 30, 0).unwrap(),
             ],
             timezone,
         };
 
         // Weekends are correct
         assert_eq!(
-            sched.interval(timezone.ymd(2022, 1, 1).and_hms(9, 0, 0), 0),
+            sched.interval(timezone.with_ymd_and_hms(2022, 1, 1, 9, 0, 0).unwrap(), 0),
             Interval::new(
                 timezone
-                    .ymd(2021, 12, 31)
-                    .and_hms(11, 30, 0)
+                    .with_ymd_and_hms(2021, 12, 31, 11, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(10, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc)
             )
         );
 
         // prev and next are reversible
-        let dt = timezone.ymd(2022, 1, 3).and_hms(11, 0, 0);
+        let dt = timezone.with_ymd_and_hms(2022, 1, 3, 11, 0, 0).unwrap();
         assert_eq!(
             sched.interval(dt, 0),
             Interval::new(
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(10, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(11, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 11, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc)
             )
         );
@@ -426,12 +425,12 @@ mod tests {
             sched.interval(dt, -1),
             Interval::new(
                 timezone
-                    .ymd(2021, 12, 31)
-                    .and_hms(11, 30, 0)
+                    .with_ymd_and_hms(2021, 12, 31, 11, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(10, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 10, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc)
             )
         );
@@ -441,12 +440,12 @@ mod tests {
             sched.interval(dt, 1),
             Interval::new(
                 timezone
-                    .ymd(2022, 1, 3)
-                    .and_hms(11, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 3, 11, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc),
                 timezone
-                    .ymd(2022, 1, 4)
-                    .and_hms(10, 30, 0)
+                    .with_ymd_and_hms(2022, 1, 4, 10, 30, 0)
+                    .unwrap()
                     .with_timezone(&Utc)
             )
         );

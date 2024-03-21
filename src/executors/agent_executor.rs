@@ -192,7 +192,7 @@ async fn start_agent_executor(
                 varmap,
                 output_options,
                 response,
-                kill,
+                kill: _,
             } => {
                 let task = extract_details(&details).unwrap();
                 let resources = task.resources.clone();

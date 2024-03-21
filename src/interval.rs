@@ -86,15 +86,15 @@ mod tests {
 
     macro_rules! dt {
         ( $x:literal ) => {
-            Utc.ymd(2022, 1, 1).and_hms($x, 0, 0)
+            Utc.with_ymd_and_hms(2022, 1, 1,$x, 0, 0).unwrap()
         };
     }
 
     macro_rules! intv {
         ( $x:literal, $y:literal ) => {
             Interval::new(
-                Utc.ymd(2022, 1, 1).and_hms($x, 0, 0),
-                Utc.ymd(2022, 1, 1).and_hms($y, 0, 0),
+                Utc.with_ymd_and_hms(2022, 1, 1,$x, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2022, 1, 1,$y, 0, 0).unwrap(),
             )
         };
     }

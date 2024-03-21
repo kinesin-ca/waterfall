@@ -8,18 +8,18 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = { version = "0.6", features = ["serde"] }
+chrono-tz = { version = "0.8", features = ["serde"] }
 futures = "0.3"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 users = { version = "0.11", optional = true }
-psutil = { version = "3.2", features = ["process"] }
-sysinfo = "0.23"
+psutil = { version = "3.3", features = ["process"] }
+sysinfo = "0.30"
 redis = { version = "*", features = ["aio", "tokio-comp"] }
-clap = { version = "3.1", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
 actix-web = "4"
-actix-cors = "0.6"
+actix-cors = "0.7"

@@ -12,7 +12,7 @@ pub async fn start_redis_storage(
     prefix: String,
 ) -> Result<()> {
     let client = redis::Client::open(url)?;
-    let mut conn = client.get_async_connection().await?;
+    let mut conn = client.get_multiplexed_async_connection().await?;
 
     while let Some(msg) = msgs.recv().await {
         use StorageMessage::*;
