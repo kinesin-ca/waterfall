@@ -213,9 +213,9 @@ async fn get_detailed_timeline(
 ///     What resources it relies on
 ///     Last attempt (if any)
 async fn get_segment_details(
-    max_intervals: web::Query<Option<usize>>,
-    span: web::Json<Interval>,
-    state: web::Data<AppState>,
+    _max_intervals: web::Query<Option<usize>>,
+    _span: web::Json<Interval>,
+    _state: web::Data<AppState>,
 ) -> impl Responder {
     /*
     let interval = span.into_inner();

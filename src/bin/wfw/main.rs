@@ -28,7 +28,7 @@ async fn submit_task(
     let submission = details.into_inner();
 
     // Need to keep this unused, otherwise the LE will kill it immediately
-    let (kill_tx, kill) = oneshot::channel();
+    let (_kill_tx, kill) = oneshot::channel();
     data.executor
         .send(ExecutorMessage::ExecuteTask {
             details: submission.details,

@@ -611,7 +611,7 @@ impl Runner {
             if !task.can_run(action.interval, &self.current) {
                 continue;
             }
-            let (kill_tx, kill) = oneshot::channel();
+            let (_kill_tx, kill) = oneshot::channel();
             let varmap: VarMap = VarMap::from_interval(&action.interval, task.timezone)
                 .iter()
                 .chain(self.vars.iter())
@@ -713,7 +713,7 @@ mod tests {
             "world_test".to_owned(),
         );
 
-        let (runner_tx, runner_rx) = mpsc::unbounded_channel();
+        let (_runner_tx, runner_rx) = mpsc::unbounded_channel();
         let mut runner = Runner::new(
             tasks,
             world_def.variables,

@@ -98,7 +98,7 @@ impl Satisfiable for SingleRequirement {
     fn resources(&self) -> HashSet<Resource> {
         match self {
             SingleRequirement::Offset { resource, .. } => HashSet::from([resource.to_owned()]),
-            SingleRequirement::File { path } => HashSet::new(),
+            SingleRequirement::File { path: _ } => HashSet::new(),
         }
     }
 
