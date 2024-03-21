@@ -2,6 +2,9 @@
 
 Waterfall is a declarative task execution framework. 
 
+This was really an exploration of Rust and Async, and is not intended to be
+used in production. It's not even close to being ready for that.
+
 # Why Another Execution Framework
 
 There are many, many execution frameworks out there that support defining

@@ -381,14 +381,16 @@ impl Runner {
             self.events
                 .push(delayed_event(Duration::try_seconds(0).unwrap(), msg));
         }
+        /*
         match self.actions.last() {
             Some(action) => {
                 if action.interval.end <= Utc::now() {
                     self.tick()
                 }
             }
-            None => self.tick(),
+            None => {}
         }
+        */
 
         // Perform maintenance
         self.queue_actions();
