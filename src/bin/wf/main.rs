@@ -2,7 +2,7 @@ use clap::Parser;
 
 use log::*;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use waterfall;
 use waterfall::prelude::*;
 

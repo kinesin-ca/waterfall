@@ -206,8 +206,8 @@ mod tests {
     macro_rules! interval {
         ( $x:literal, $y:literal ) => {
             Interval::new(
-                Utc.with_ymd_and_hms(2022, 1, 1, $x, 0, 0),
-                Utc.with_ymd_and_hms(2022, 1, 1, $y, 0, 0),
+                Utc.with_ymd_and_hms(2022, 1, 1, $x, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2022, 1, 1, $y, 0, 0).unwrap(),
             )
         };
     }

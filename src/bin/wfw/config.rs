@@ -1,12 +1,13 @@
-pub use serde::{Deserialize, Serialize};
+pub use serde::Deserialize;
 use std::fmt::Debug;
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::System;
 use tokio::sync::mpsc;
 use waterfall::prelude::*;
 
 fn default_resources() -> TaskResources {
-    let system = System::new_with_specifics(RefreshKind::new().with_cpu().with_memory());
-    let cores = (system.processors().len() as i64) - 2;
+    let mut system = System::new_all();
+    system.refresh_all();
+    let cores = (system.cpus().len() as i64) - 2;
     let free_memory = (system.total_memory() - system.used_memory()) as f64;
     let memory_mb = ((free_memory * 0.8) as i64) / 1024;
 
