@@ -134,7 +134,7 @@ impl TaskDefinition {
             provides,
             requires: self.requires.clone(),
 
-            schedule: schedule,
+            schedule,
             valid_over: IntervalSet::from(Interval::new(start, actual_end)),
             timezone: self.timezone,
         }
@@ -424,9 +424,20 @@ mod tests {
         {
             let mut task_def: TaskDefinition = serde_json::from_str(task_json).unwrap();
 
-            task_def.times = vec![NaiveTime::from_hms(9, 0, 0), NaiveTime::from_hms(12, 0, 0)];
-            task_def.valid_from = NaiveDate::from_ymd(2022, 1, 1).and_hms(9, 0, 0);
-            task_def.valid_to = Some(NaiveDate::from_ymd(2022, 1, 7).and_hms(17, 0, 0));
+            task_def.times = vec![
+                NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+                NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            ];
+            task_def.valid_from = NaiveDate::from_ymd_opt(2022, 1, 1)
+                .unwrap()
+                .and_hms_opt(9, 0, 0)
+                .unwrap();
+            task_def.valid_to = Some(
+                NaiveDate::from_ymd_opt(2022, 1, 7)
+                    .unwrap()
+                    .and_hms_opt(17, 0, 0)
+                    .unwrap(),
+            );
 
             let task = task_def.to_task("task", &cal);
 
