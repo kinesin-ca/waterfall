@@ -27,5 +27,6 @@ pub enum StorageMessage {
     Stop {},
 }
 
+pub mod memory;
 pub mod noop;
 pub mod redis;

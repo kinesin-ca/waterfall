@@ -709,11 +709,7 @@ mod tests {
 
         // Storage
         let (storage_tx, storage_rx) = mpsc::unbounded_channel();
-        let storage = storage::redis::start(
-            storage_rx,
-            "redis://localhost".to_owned(),
-            "world_test".to_owned(),
-        );
+        let storage = storage::memory::start(storage_rx);
 
         let (_runner_tx, runner_rx) = mpsc::unbounded_channel();
         let mut runner = Runner::new(
